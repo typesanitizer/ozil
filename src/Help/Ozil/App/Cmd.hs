@@ -1,11 +1,11 @@
 module Help.Ozil.App.Cmd
-  ( Options
+  ( Options (..) -- TODO: Avoid exporting constructors.
   , options
   , defaultMain
   )
   where
 
-import Data.Semigroup
+import Data.Semigroup ((<>))
 import Options.Applicative
 
 defaultMain :: (Options -> IO b) -> IO b
@@ -21,6 +21,7 @@ defaultMain runOzil = execParser opts >>= runOzil
 
 data Options = Options
   { autofind :: Bool
+  , configFile :: Maybe FilePath
   , cmdname :: [String]
   }
   deriving Show
@@ -34,6 +35,13 @@ options =
     <$> offSwitch
           (  long "no-autofind"
           <> help "Turn off intelligent searching if binary is missing."
+          )
+    <*> option
+          auto
+          (  long "config"
+          <> short 'c'
+          <> help "Path to config file (default name: .ozil.yaml)."
+          <> metavar "PATH"
           )
     <*> cmdnameP
   where cmdnameP = some . strArgument $ metavar "<cmd>"
