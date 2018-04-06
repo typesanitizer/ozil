@@ -22,11 +22,38 @@ description:         Please see the README on Github at <https://github.com/thei
 dependencies:
 - base >= 4.7 && < 5
 
+ghc-options:
+- -Wall
+- -Wnoncanonical-monad-instances
+- -Wnoncanonical-monadfail-instances
+- -Wnoncanonical-monoid-instances
+- -Wredundant-constraints
+- -Wno-type-defaults
+
+default-extensions:
+- DeriveGeneric
+- DeriveDataTypeable
+- DeriveFunctor
+- DeriveFoldable
+- DeriveTraversable
+- StandaloneDeriving
+- FlexibleInstances
+- FlexibleContexts
+- MultiParamTypeClasses
+- BangPatterns
+- LambdaCase
+- NamedFieldPuns
+- OverloadedStrings
+- TupleSections
+
 library:
   source-dirs: src
   dependencies:
   - yaml >= 0.8.29 && < 0.9
   - optparse-applicative >= 0.14 && < 0.15
+  - text >= 1.2 && < 1.3
+  - lens >= 4.16 && < 4.17
+  - containers >= 0.5.10 && < 0.6
 
 executables:
   ozil-exe:
