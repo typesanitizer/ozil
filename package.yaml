@@ -24,11 +24,13 @@ dependencies:
 
 library:
   source-dirs: src
+  dependencies:
+  - yaml >= 0.8.29 && < 0.9
+  - optparse-applicative >= 0.14 && < 0.15
 
 executables:
   ozil-exe:
-    main:                Main.hs
-    source-dirs:         app
+    main:                ozil.hs
     ghc-options:
     - -threaded
     - -rtsopts
