@@ -3,7 +3,7 @@
 
 module Help.Ozil.App.Cmd.Types where
 
-import Control.Lens.TH (makeFields)
+import Control.Lens.TH (makeFields, makePrisms)
 
 data ConfigOptions
   = ConfigInit   -- ^ Initialize a config file.
@@ -61,7 +61,9 @@ data Options = Options
   , _optionsOptCommand :: !Command
   } deriving Show
 
+
 makeFields ''InputFile
 makeFields ''DefaultOptions
 makeFields ''WhatIsOptions
+makePrisms ''Command
 makeFields ''Options

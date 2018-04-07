@@ -20,13 +20,14 @@ newtype O a = O { unO :: ReaderT Options (StateT Config IO) a}
            , Monad
            , MonadReader Options
            , MonadState Config
+           , MonadIO
            )
 
-runO :: r -> s -> StateT s (ReaderT r m) a -> m (a, s)
-runO r s ma = runReaderT (runStateT ma s) r
+runO :: Options -> Config -> O a -> IO (a, Config)
+runO r s ma = runStateT (runReaderT (unO ma) r) s
 
-evalO :: Monad m => r -> s -> StateT s (ReaderT r m) a -> m a
-evalO r s ma = runReaderT (evalStateT ma s) r
+evalO :: Options -> Config -> O a -> IO a
+evalO r s ma = evalStateT (runReaderT (unO ma) r) s
 
-execO :: Monad m => r -> s -> StateT s (ReaderT r m) a -> m s
-execO r s ma = runReaderT (execStateT ma s) r
+execO :: Options -> Config -> O a -> IO Config
+execO r s ma = execStateT (runReaderT (unO ma) r) s
