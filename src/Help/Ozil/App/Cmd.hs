@@ -1,12 +1,21 @@
+{-# LANGUAGE MultiWayIf             #-}
+{-# LANGUAGE TemplateHaskell        #-}
+{-# LANGUAGE FunctionalDependencies #-}
+
 module Help.Ozil.App.Cmd
-  ( Options (..) -- TODO: Avoid exporting constructors.
-  , options
-  , defaultMain
-  )
+  -- ( Options (..) -- TODO: Avoid exporting constructors.
+  -- , options
+  -- , defaultMain
+  -- )
   where
 
-import Data.Semigroup ((<>))
 import Options.Applicative
+
+import Control.Lens.TH (makeFields)
+import Data.Semigroup ((<>))
+import System.FilePath (takeExtension)
+
+-- * Runner
 
 defaultMain :: (Options -> IO b) -> IO b
 defaultMain runOzil = execParser opts >>= runOzil
@@ -19,15 +28,25 @@ defaultMain runOzil = execParser opts >>= runOzil
          "ozil assists you with viewing man/help pages. It is intended as a replacement to man/--help + less/more/most."
     )
 
-data Options = Options
-  { autofind :: Bool
-  , configFile :: Maybe FilePath
-  , cmdname :: [String]
-  }
+-- * Types
+
+data InputFileType
+  = Binary
+  | ManPage { _zipped :: !Bool }
   deriving Show
 
-offSwitch :: Mod FlagFields Bool -> Parser Bool
-offSwitch = fmap not . switch
+data InputFile = InputFile
+  { _inputFileFileType :: !InputFileType
+  , _inputFilePath :: !FilePath
+  } deriving Show
+
+data Options = Options
+  { _optionsAutofind :: !Bool
+  , _optionsConfigPath :: !(Maybe FilePath)
+  , _optionsInputs :: ![InputFile]
+  } deriving Show
+
+-- * Parsers
 
 options :: Parser Options
 options =
@@ -43,5 +62,16 @@ options =
           <> help "Path to config file (default name: .ozil.yaml)."
           <> metavar "PATH"
           )
-    <*> cmdnameP
-  where cmdnameP = some . strArgument $ metavar "<cmd>"
+    <*> filesP
+ where
+  offSwitch = fmap not . switch
+  filesP = some (toInputFile <$> strArgument (metavar "<files>"))
+  toInputFile s = InputFile filetype s
+    where
+      ext = takeExtension s
+      filetype = case ext of
+          "" -> Binary
+          _ -> ManPage (ext == ".gz")
+
+makeFields ''InputFile
+makeFields ''Options

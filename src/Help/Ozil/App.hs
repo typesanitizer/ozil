@@ -21,13 +21,12 @@ selectPage opts = do
   helpPage <- getHelpPage opts
   userSelection . catMaybes $ helpPage : manPages
 
+-- getManPages :: Options -> IO DocPage
 getManPages = undefined
 
 getHelpPage = undefined
 
 userSelection = undefined
--- getManPages :: Options -> IO DocPage
--- getManPages = 
 
 viewPage :: Options -> DocPage -> IO ()
 viewPage = undefined
