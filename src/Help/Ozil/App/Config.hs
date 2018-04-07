@@ -1,8 +1,9 @@
 module Help.Ozil.App.Config where
 
+import Data.Set (Set)
 import Data.Text (Text)
-import Data.Vector.Unboxed as VU
 
-newtype Config = Config
-  { helpByDefault :: VU.Vector Text
+data Config = Config
+  { helpByDefault :: Set Text
+  , databasePath :: FilePath
   }
