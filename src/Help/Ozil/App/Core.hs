@@ -10,7 +10,7 @@ module Help.Ozil.App.Core
 import Control.Monad.Reader
 import Control.Monad.State.Strict
 
-import Help.Ozil.App.Config (Config (..))
+import Help.Ozil.App.Config.Types (Config (..))
 import Help.Ozil.App.Cmd (Options)
 
 -- | Everything in the app runs inside the O monad.

@@ -4,7 +4,7 @@ This module should be imported qualified.
 -}
 module Help.Ozil.App.Default where
 
-import Help.Ozil.App.Config
+import Help.Ozil.App.Config.Types
 
 import Control.Lens ((<&>))
 import Data.Set (empty)
