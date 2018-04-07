@@ -27,8 +27,8 @@ defaultMain runOzil = execParser opts >>= runOzil
     (  fullDesc
     <> header "ozil - Frictionless browsing of man/help pages."
     <> progDesc
-         "ozil assists you with viewing man/help pages (collectively termed \
-         \\"doc pages\"). It is intended as a replacement for man/--help + \
+         "ozil assists you with viewing man/help pages. \
+         \It is intended as a replacement for man/--help + \
          \less/more/most."
     )
 
@@ -92,16 +92,24 @@ data Options = Options
 
 -- * Parsers
 
+configPathP :: Parser (Maybe FilePath)
+configPathP
+  = optional . option auto
+  $ long "config"
+  <> short 'c'
+  <> help ("Path to config file [default: " ++ Default.configFilePath ++ "].")
+  <> metavar "PATH"
+
 configOptionsP :: Parser ConfigOptions
 configOptionsP = subparser
    (  command "init"
       (info
        (pure ConfigInit)
-       (progDesc "Initialize a configuration file."))
+       (progDesc "Initialize a config file."))
    <> command "delete"
       (info
        (pure ConfigDelete)
-       (progDesc "Delete the configuration file."))
+       (progDesc "Delete the config file."))
    <> command "reinit"
       (info
        (pure ConfigReInit)
@@ -115,6 +123,7 @@ configOptionsP = subparser
          $ "Sync " ++ Default.configFile ++ " with /etc/manpath.config."))
    )
 
+commonOptionsP :: Parser CommonOptions
 commonOptionsP = CommonOptions
   <$>
   offSwitch
@@ -138,25 +147,43 @@ commonOptionsP = CommonOptions
           "" -> Binary
           _  -> ManPage (ext == ".gz")
 
-configPathP :: Parser (Maybe FilePath)
-configPathP
-  = option auto
-  $ long "config"
-  <> short 'c'
-  <> help "Path to config file [default: .ozil.yaml]."
-  <> metavar "PATH"
+whatIsOptionsP :: Parser WhatIsOptions
+whatIsOptionsP = WhatIsOptions
+  <$> queryP
+  <*> commonOptionsP
+  where
+    queryP
+      =   flag' (Just QueryDefault)
+          (short 'q' <> long "query"
+           <> help "Search sections Name and Description, like apropos(1).")
+      <|> flag' (Just QueryFull)
+          (long "query-full"
+           <> help "Search man pages fully.")
+      <|> pure Nothing
 
 options :: Parser Options
 options = Options
   <$> configPathP
-  <*> ( Default <$> commonOptionsP
-    <|>
-    hsubparser
-     (command "config"
+  <*>
+  ( Default <$> commonOptionsP
+    <|> hsubparser
+        (  configSubP
+        <> whatIsSubP
+        )
+  )
+  where
+    configSubP =
+      command "config"
       (info (Config <$> configOptionsP)
        . progDesc
-        $ "Tweak configuration [default: " ++ Default.configFilePath ++ "]."))
-  )
+       $ "Tweak config file [default: " ++ Default.configFilePath ++ "].")
+    whatIsSubP =
+     command "whatis"
+      (info (WhatIs <$> whatIsOptionsP)
+      . progDesc
+       $ "Search man page sections [default: Names only, like whatis(1)]. \
+         \The result is opened using ozil so you may follow pages using \
+         \hints.")
 
 makeFields ''InputFile
 makeFields ''CommonOptions
