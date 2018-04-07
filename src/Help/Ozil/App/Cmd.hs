@@ -27,7 +27,9 @@ defaultMain runOzil = execParser opts >>= runOzil
     (  fullDesc
     <> header "ozil - Frictionless browsing of man/help pages."
     <> progDesc
-         "ozil assists you with viewing man/help pages. It is intended as a replacement to man/--help + less/more/most."
+         "ozil assists you with viewing man/help pages (collectively termed \
+         \\"doc pages\"). It is intended as a replacement for man/--help + \
+         \less/more/most."
     )
 
 -- * Types
@@ -39,6 +41,10 @@ data ConfigOptions
   | ConfigSync   -- ^ Sync with manpath.config
   deriving Show
 
+-- Not entirely sure if we will need a database for faster indexing.
+-- I suppose it depends on how many directories they have on their
+-- man path, as well as if they're using an HDD vs an SSD.
+-- We could do benchmarks later and see if we want to support this.
 data DbOptions
   = DbInit
   | DbLocate
@@ -74,19 +80,20 @@ data WhatIsOptions = WhatIsOptions
 
 data Command
   = Config !ConfigOptions
-  | Db !DbOptions
+  -- | Db !DbOptions
   | Default !DefaultOptions
   | WhatIs !WhatIsOptions
   deriving Show
 
 data Options = Options
-  { _optionsOptCommand :: !Command
-  , _optionsConfigPath :: !(Maybe FilePath)
+  { _optionsConfigPath :: !(Maybe FilePath)
+  , _optionsOptCommand :: !Command
   } deriving Show
 
 -- * Parsers
 
-configOptionsP = hsubparser
+configOptionsP :: Parser ConfigOptions
+configOptionsP = subparser
    (  command "init"
       (info
        (pure ConfigInit)
@@ -108,32 +115,48 @@ configOptionsP = hsubparser
          $ "Sync " ++ Default.configFile ++ " with /etc/manpath.config."))
    )
 
+commonOptionsP = CommonOptions
+  <$>
+  offSwitch
+  (long "no-autofind"
+   <> help "Don't try to be clever: only search for exact matches. \
+           \Otherwise, ozil usually tries to be intelligent - \
+           \if you ran 'ozil foo' inside a stack project and it failed, then \
+           \ozil will automatically try 'ozil stack exec foo'.")
+  <*> some (toInputFile <$> strArgument
+            (metavar "<files>"
+             <> help "Input: can be a binary name (e.g. gcc), or a \
+                     \man page (e.g. gcc.1 or gcc.1.gz). If more \
+                     \than one argument is given, the doc pages are \
+                     \opened sequentially."))
+  where
+    offSwitch = fmap not . switch
+    toInputFile s = InputFile filetype s
+      where
+        ext      = takeExtension s
+        filetype = case ext of
+          "" -> Binary
+          _  -> ManPage (ext == ".gz")
+
 configPathP :: Parser (Maybe FilePath)
 configPathP
   = option auto
   $ long "config"
   <> short 'c'
-  <> help "Path to config file (default: .ozil.yaml)."
+  <> help "Path to config file [default: .ozil.yaml]."
   <> metavar "PATH"
 
 options :: Parser Options
 options = Options
-  <$> hsubparser
-  (command "config"
-   (info (Config <$> configOptionsP)
-    (progDesc
-     $ "Tweak configuration [default: " ++ Default.configFilePath ++ "]."))
+  <$> configPathP
+  <*> ( Default <$> commonOptionsP
+    <|>
+    hsubparser
+     (command "config"
+      (info (Config <$> configOptionsP)
+       . progDesc
+        $ "Tweak configuration [default: " ++ Default.configFilePath ++ "]."))
   )
-  <*> configPathP
- where
-  offSwitch = fmap not . switch
-  filesP    = some (toInputFile <$> strArgument (metavar "<files>"))
-  toInputFile s = InputFile filetype s
-   where
-    ext      = takeExtension s
-    filetype = case ext of
-      "" -> Binary
-      _  -> ManPage (ext == ".gz")
 
 makeFields ''InputFile
 makeFields ''CommonOptions
