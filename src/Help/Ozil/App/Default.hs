@@ -40,6 +40,13 @@ config :: IO Config
 config = do
   p <- dbFilePath
   pure Config
-    { helpByDefault = empty
-    , databasePath = p
+    { _systemInfo = SystemInfo
+      { _ozilConfigDirExists = False
+      , _ozilConfigFileExists = False
+      , _ozilDbExists = False
+      }
+    , _userConfig = UserConfig
+      { _helpByDefault = empty
+      , _databasePath = p
+      }
     }
