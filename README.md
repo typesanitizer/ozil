@@ -1,10 +1,19 @@
 # ozil - A man with intelligence and vision
 
 `ozil` assists you with viewing man/help pages. It is intended as a
-replacement to `man`/`--help` + `less`/`more`/`most`.
+replacement to `man`/`--help` + `less`/`more`/`most`.\*
 
 Currently, only Linux is supported. Support for other platforms depends
 on user contributions.
+
+\* On many (most?) modern distributions, `man-db` provides
+the `man` command plus a few others (`whatis`, `apropos`, `mandb` etc).
+While `ozil` is not intended as a direct substitute for `man-db`, it does
+provide substitutes for common use cases -
+
+* `whatis` becomes `wat` (alias for `ozil whatis`).
+* `apropos` becomes `wat --query` (or `wat -q`).
+* `mandb` becomes `ozil sync`.
 
 ## Features
 
