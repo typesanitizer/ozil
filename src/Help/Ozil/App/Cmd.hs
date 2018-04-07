@@ -2,12 +2,8 @@
 {-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE FunctionalDependencies #-}
 
-module Help.Ozil.App.Cmd
-  -- ( Options (..) -- TODO: Avoid exporting constructors.
-  -- , options
-  -- , defaultMain
-  -- )
-  where
+-- TODO: Avoid exporting constructors?
+module Help.Ozil.App.Cmd where
 
 import Options.Applicative
 
@@ -63,19 +59,19 @@ data InputFile = InputFile
   , _inputFilePath :: !FilePath
   } deriving Show
 
-data CommonOptions = CommonOptions
-  { _commonOptionsAutofind :: !Bool
-  , _commonOptionsInputs :: ![InputFile]
+data DefaultOptions = DefaultOptions
+  { _defaultOptionsAutofind :: !Bool
+  , _defaultOptionsInputs :: ![InputFile]
   } deriving Show
-
-type DefaultOptions = CommonOptions
 
 data Query = QueryDefault | QueryFull
   deriving Show
 
+type RegexStr = String
+
 data WhatIsOptions = WhatIsOptions
   { _whatIsOptionsQuery :: Maybe Query
-  , _whatisOptionsCommon :: CommonOptions
+  , _whatIsOptionsInputs :: RegexStr
   } deriving Show
 
 data Command
@@ -123,15 +119,14 @@ configOptionsP = subparser
          $ "Sync " ++ Default.configFile ++ " with /etc/manpath.config."))
    )
 
-commonOptionsP :: Parser CommonOptions
-commonOptionsP = CommonOptions
-  <$>
-  offSwitch
-  (long "no-autofind"
-   <> help "Don't try to be clever: only search for exact matches. \
-           \Otherwise, ozil usually tries to be intelligent - \
-           \if you ran 'ozil foo' inside a stack project and it failed, then \
-           \ozil will automatically try 'ozil stack exec foo'.")
+defaultOptionsP :: Parser DefaultOptions
+defaultOptionsP = DefaultOptions
+  <$> offSwitch
+      (long "no-autofind"
+       <> help "Don't try to be clever: only search for exact matches. \
+               \Otherwise, ozil usually tries to be intelligent - \
+               \if you ran 'ozil foo' inside a stack project and it failed, \
+               \then ozil will automatically try 'ozil stack exec foo'.")
   <*> some (toInputFile <$> strArgument
             (metavar "<files>"
              <> help "Input: can be a binary name (e.g. gcc), or a \
@@ -147,10 +142,15 @@ commonOptionsP = CommonOptions
           "" -> Binary
           _  -> ManPage (ext == ".gz")
 
+-- TODO: Briefly explain syntax of POSIX regexes and give usage examples.
+-- Also, add link to canonical resources on POSIX regexes (both online and
+-- man page).
 whatIsOptionsP :: Parser WhatIsOptions
 whatIsOptionsP = WhatIsOptions
   <$> queryP
-  <*> commonOptionsP
+  <*> strArgument
+       (metavar "<regexes>"
+        <> help "POSIX regular expressions to search.")
   where
     queryP
       =   flag' (Just QueryDefault)
@@ -165,11 +165,11 @@ options :: Parser Options
 options = Options
   <$> configPathP
   <*>
-  ( Default <$> commonOptionsP
-    <|> hsubparser
+  (   hsubparser
         (  configSubP
         <> whatIsSubP
         )
+  <|> Default <$> defaultOptionsP
   )
   where
     configSubP =
@@ -186,6 +186,6 @@ options = Options
          \hints.")
 
 makeFields ''InputFile
-makeFields ''CommonOptions
+makeFields ''DefaultOptions
 makeFields ''WhatIsOptions
 makeFields ''Options
