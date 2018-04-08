@@ -84,7 +84,8 @@ readWriteConfig = \case
     Config ConfigReInit -> readConfig *> syncConfig *> liftIO exitSuccess
     _                   -> readConfig
  where
-  syncConfig = undefined
+  -- TODO: Implement this.
+  syncConfig = pure ()
   readConfig = liftIO (decodeFileEither =<< Default.configFilePath) >>= \case
     Right cfg -> L.assign Conf.userConfig cfg
     Left err ->
