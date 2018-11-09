@@ -34,15 +34,16 @@ Protip: When your colleagues ask you what software you're using, you can say
 
 ## Relation to mandb
 
-Currently `ozil` depends on `man` for path handling; it doesn't duplicate
-databases. Also, on many (most?) modern distributions, `man-db` provides
-the `man` command plus a few others (`whatis`, `apropos`, `mandb` etc).
-While `ozil` is not intended as a direct substitute for `man-db`, it does
-provide substitutes for common use cases -
+- Currently `ozil` depends on `man` for path handling; it doesn't duplicate
+  databases or go hunting for files by itself. This may change in the future.
+- Also, on many (most?) modern distributions, `man-db` provides
+  the `man` command plus a few others (`whatis`, `apropos`, `mandb` etc).
+  While `ozil` is not intended as a direct substitute for `man-db`, it does
+  provide substitutes for common use cases -
 
-* `whatis` becomes `ozil wat`.
-* `apropos` becomes `ozil waaat`.
-* `mandb` becomes `ozil sync`.
+  * `whatis` becomes `ozil wat`.
+  * `apropos` becomes `ozil grep`.
+  * `mandb` becomes `ozil sync`.
 
 ## Contributing
 

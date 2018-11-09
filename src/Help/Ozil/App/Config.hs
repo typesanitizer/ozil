@@ -1,20 +1,24 @@
+{-# LANGUAGE RankNTypes #-}
+
 module Help.Ozil.App.Config
   ( getConfig
   , saveConfig
+  , module Help.Ozil.App.Config.Watch
   )
   where
 
 import Help.Ozil.App.Core
 import Help.Ozil.App.Cmd
 import Help.Ozil.App.Console.Text
+import Help.Ozil.App.Config.Watch
+import Help.Ozil.App.Death
 import System.Directory
 
-import Control.Lens.Extra ((<~=))
-import Control.Monad (unless, when, join)
-import Control.Monad.Extra (liftM2_1)
+import Control.Lens ((^.))
+import Control.Monad (when)
 import Control.Monad.IO.Class (liftIO)
 import Data.Yaml (prettyPrintParseException, decodeFileEither, encode)
-import System.Exit (exitSuccess, die)
+import System.Exit (exitSuccess)
 import Text.Printf (printf)
 
 import qualified Control.Lens as L
@@ -25,85 +29,96 @@ import qualified Help.Ozil.App.Config.Types as Conf
 
 getConfig :: O ()
 getConfig =
-  foundConfigDir
-    >>= deleteConfigDirIfApplicable
+  foundConfigFile
+    >>= deleteConfigFileIfApplicable
     >>= createConfigFileIfApplicable
     >>= readWriteConfig
     >>  checkDbExists
     >>= syncDbIfApplicable
 
-foundConfigDir :: O Bool
-foundConfigDir =
-  Conf.configDirExists <~= liftIO (doesDirectoryExist =<< Default.configDir)
+foundConfigFile :: O OzilFileExists
+foundConfigFile = do
+  b <- liftIO (doesFileExist Default.configPath)
+  modifyConfig (L.set Conf.configFileExists b)
+  pure (L.view exists b)
 
-deleteConfigDirIfApplicable :: Bool -> O Bool
-deleteConfigDirIfApplicable ozilDirExists = L.view optCommand >>= \case
-  Config ConfigDelete -> delete >> liftIO exitSuccess
-  Config ConfigReInit -> delete >> pure False
-  _                   -> pure ozilDirExists
+data OzilFileExists = OzilFileMissing | OzilFileExists
+
+exists :: L.Iso' Bool OzilFileExists
+exists = L.iso
+  (\case {False -> OzilFileMissing; True -> OzilFileExists})
+  (\case {OzilFileMissing -> False; OzilFileExists -> True})
+
+deleteConfigFileIfApplicable :: OzilFileExists -> O OzilFileExists
+deleteConfigFileIfApplicable ozilFileExists = L.view optCommand >>= \case
+  Config ConfigDelete -> delete *> liftIO exitSuccess
+  Config ConfigReInit -> delete *> pure OzilFileMissing
+  Config ConfigSync   -> pure ozilFileExists
+  Config ConfigInit   -> pure ozilFileExists
+  WhatIs _            -> pure ozilFileExists
+  Default _           -> pure ozilFileExists
  where
-  delete = when ozilDirExists $ do
-    liftIO $ removePathForcibly =<< Default.configFilePath
-    L.assign Conf.configDirExists False
+  delete = when (ozilFileExists ^. L.from exists) $ do
+    liftIO $ removePathForcibly Default.configPath
+    modifyConfig (L.set Conf.configFileExists False)
 
-createConfigFileIfApplicable :: Bool -> O Bool
-createConfigFileIfApplicable ozilDirExists = L.view optCommand >>= \case
-  Config ConfigInit   -> initAction *> liftIO exitSuccess
-  Config ConfigReInit -> initAction *> ozilFileExists
-  _                   -> do
-    liftM2_1 unless ozilFileExists $ do
+createConfigFileIfApplicable :: OzilFileExists -> O OzilFileExists
+createConfigFileIfApplicable ozilFileExists = L.view optCommand >>= \case
+  Default{}           -> promptInit
+  WhatIs{}            -> pure ozilFileExists
+  Config ConfigInit   -> initAction (oDie alreadyExistsMsg) *> liftIO exitSuccess
+  Config ConfigReInit -> initAction unreachableErrorM *> pure OzilFileExists
+  Config ConfigDelete -> unreachableError
+  Config ConfigSync   -> promptInit
+ where
+  promptInit = case ozilFileExists of
+    OzilFileExists -> pure OzilFileExists
+    OzilFileMissing -> do
       create <- liftIO $ prompt True promptMsg
-      when create initAction
-    ozilFileExists
- where
-  ozilFileExists :: O Bool
-  ozilFileExists = Conf.configFileExists <~= liftIO
-    ((ozilDirExists &&) <$> (doesFileExist =<< Default.configFilePath))
-  initAction :: O ()
-  initAction = ozilFileExists >>= \case
-    True  -> liftIO $ die alreadyExistsMsg
-    False -> do
+      when create (initAction unreachableError)
+      pure (create ^. exists)
+  initAction :: (forall a. O a) -> O ()
+  initAction death = case ozilFileExists of
+    OzilFileExists  -> death
+    OzilFileMissing -> do
       liftIO $ do
-        createDirectoryIfMissing True =<< Default.configDir
-        join
-          $   BS.writeFile
-          <$> Default.configFilePath
-          <*> fmap (encode . L.view Conf.userConfig) Default.config
-      L.assign Conf.configDirExists  True
-      L.assign Conf.configFileExists True
+        createDirectoryIfMissing True Default.configDir
+        BS.writeFile Default.configPath
+          $ (encode . L.view Conf.userConfig) Default.config
+      modifyConfig (L.set Conf.configFileExists True)
   alreadyExistsMsg
     = "Error: configuration file already exists. \
       \Maybe you wanted to use ozil config reinit?"
-  promptMsg = "Configuration directory not found. Should I initialize one?"
+  promptMsg = "Configuration file not found. Should I initialize one?"
 
-readWriteConfig :: Bool -> O ()
+readWriteConfig :: OzilFileExists -> O ()
 readWriteConfig = \case
-  False -> undefined
-  True  -> L.view optCommand >>= \case
+  OzilFileMissing -> undefined
+  OzilFileExists  -> L.view optCommand >>= \case
     Config ConfigSync   -> readConfig *> syncConfig *> liftIO exitSuccess
     Config ConfigReInit -> readConfig *> syncConfig *> liftIO exitSuccess
-    _                   -> readConfig
+    Config ConfigDelete -> pure ()
+    Config ConfigInit   -> pure ()
+    Default{}           -> pure ()
+    WhatIs{}            -> pure ()
  where
   -- TODO: Implement this.
   syncConfig = pure ()
-  readConfig = liftIO (decodeFileEither =<< Default.configFilePath) >>= \case
-    Right cfg -> L.assign Conf.userConfig cfg
+  readConfig = liftIO (decodeFileEither Default.configPath) >>= \case
+    Right cfg -> modifyConfig (L.set Conf.userConfig cfg)
     Left err ->
-      liftIO $ warn =<< configDecodeWarning (prettyPrintParseException err)
-  configDecodeWarning s =
-    T.pack
-      <$> (   printf "Couldn't parse the config file %s.\n%s"
-          <$> Default.configFilePath
-          <*> pure s
-          )
+      liftIO . warn . configDecodeWarning $ prettyPrintParseException err
+  configDecodeWarning s = T.pack $
+    printf "Couldn't parse the config file %s.\n%s" Default.configPath s
 
 checkDbExists :: O Bool
-checkDbExists = do
-  p <- L.use (Conf.userConfig . Conf.databasePath)
-  (Conf.systemInfo . Conf.ozilDbExists) <~= liftIO (doesFileExist p)
+checkDbExists = pure True
+-- checkDbExists = do
+--   p <- L.use (Conf.userConfig . Conf.databasePath)
+--   (Conf.systemInfo . Conf.ozilDbExists) <~= liftIO (doesFileExist p)
 
 syncDbIfApplicable :: Bool -> O ()
-syncDbIfApplicable dbExists = undefined
+syncDbIfApplicable _ = pure ()
 
 saveConfig :: O ()
 saveConfig = undefined

@@ -1,9 +1,14 @@
 {-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE FunctionalDependencies #-}
 
-module Help.Ozil.App.Cmd.Types where
+module Help.Ozil.App.Cmd.Types
+  ( module Help.Ozil.App.Cmd.Types
+  , NonEmpty (..)
+  ) where
 
+import Control.Lens (Iso', iso)
 import Control.Lens.TH (makeFields, makePrisms)
+import Data.List.NonEmpty (NonEmpty (..))
 
 data ConfigOptions
   = ConfigInit   -- ^ Initialize a config file.
@@ -24,19 +29,35 @@ data DbOptions
   | DbReInit
   deriving Show
 
-data InputFileType
-  = Binary
-  | ManPage { _zipped :: !Bool }
+data Zipped = Unzipped | Zipped
   deriving Show
 
-data InputFile = InputFile
-  { _inputFileFileType :: !InputFileType
-  , _inputFilePath :: !FilePath
-  } deriving Show
+zipped :: Iso' Bool Zipped
+zipped = iso
+  (\case {False -> Unzipped; True -> Zipped;})
+  (\case {Unzipped -> False; Zipped -> True;})
+
+data InputFileType
+  = Binary
+  | ManPage { _zipped :: !Zipped }
+  deriving Show
+
+type FileName = FilePath
+
+data InputFile
+  = InputFile
+    { _inputFileFileType :: !InputFileType
+    , _inputFileFileName :: !FileName
+    }
+  | InputPath
+    { _inputPathFileType :: !InputFileType
+    , _inputFileFilePath :: !FilePath
+    }
+  deriving Show
 
 data DefaultOptions = DefaultOptions
   { _defaultOptionsAutofind :: !Bool
-  , _defaultOptionsInputs :: ![InputFile]
+  , _defaultOptionsInputs :: !(NonEmpty InputFile)
   } deriving Show
 
 data Query = QueryDefault | QueryFull
@@ -51,16 +72,15 @@ data WhatIsOptions = WhatIsOptions
 
 data Command
   = Config !ConfigOptions
-  -- | Db !DbOptions
   | Default !DefaultOptions
   | WhatIs !WhatIsOptions
+  -- | Db !DbOptions
   deriving Show
 
 data Options = Options
   { _optionsConfigPath :: !(Maybe FilePath)
   , _optionsOptCommand :: !Command
   } deriving Show
-
 
 makeFields ''InputFile
 makeFields ''DefaultOptions

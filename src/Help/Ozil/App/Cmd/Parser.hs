@@ -3,20 +3,23 @@ module Help.Ozil.App.Cmd.Parser
   ) where
 
 import Help.Ozil.App.Cmd.Types
+
 import Options.Applicative
 
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Semigroup ((<>))
-import System.FilePath (takeExtension)
+import System.FilePath (isPathSeparator, takeExtension)
 import Text.Printf (printf)
 
+import qualified Control.Lens as L
 import qualified Help.Ozil.App.Default as Default
 
 -- | Top-level runner
 defaultMain :: (Options -> IO b) -> IO b
-defaultMain runOzil = execParser opts >>= runOzil
+defaultMain run = execParser opts >>= run
  where
   opts = info
-    (options <**> helper)
+    (helper <*> options)
     (  fullDesc
     <> header "ozil - Frictionless browsing of man/help pages."
     <> progDesc
@@ -65,7 +68,7 @@ configOptionsP = subparser
          (pure ConfigSync)
          (  progDesc
          $  "Sync "
-         ++ Default.configFile
+         ++ Default.configFileName
          ++ " with /etc/manpath.config."
          )
        )
@@ -80,25 +83,29 @@ defaultOptionsP =
                "Don't try to be clever: only search for exact matches. \
                \Otherwise, ozil usually tries to be intelligent - \
                \if you ran 'ozil foo' inside a stack project and it failed, \
-               \then ozil will automatically try 'ozil stack exec foo'."
+               \then ozil will automatically check project binaries for \
+               \matches."
           )
-    <*> some
-          ( toInputFile <$> strArgument
-            (  metavar "<files>"
-            <> help
+    <*> (   (:| [])
+        <$> ( toInputFile <$> strArgument
+              (  metavar "<file>"
+              <> help
                  "Input: can be a binary name (e.g. gcc), or a man page \
-                 \(e.g. gcc.1 or gcc.1.gz). If more than one argument is \
-                 \given, the doc pages are opened sequentially."
+                 \(e.g. gcc.1 or gcc.1.gz) or a path (e.g. foo/a.out)."
+              )
             )
-          )
+        )
  where
   offSwitch = fmap not . switch
-  toInputFile s = InputFile filetype s
+  toInputFile s =
+    if any isPathSeparator s
+      then InputPath filetype s
+      else InputFile filetype s
    where
     ext      = takeExtension s
     filetype = case ext of
       "" -> Binary
-      _  -> ManPage (ext == ".gz")
+      _  -> ManPage (L.view zipped (ext == ".gz"))
 
 -- TODO: Briefly explain syntax of POSIX regexes and give usage examples.
 -- Also, add link to canonical resources on POSIX regexes (both online and

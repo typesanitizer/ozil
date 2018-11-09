@@ -6,47 +6,48 @@ module Help.Ozil.App.Default where
 
 import Help.Ozil.App.Config.Types
 
-import Control.Lens ((<&>))
 import Data.Set (empty)
 import Data.String (IsString)
 import System.Directory (getHomeDirectory)
 import System.FilePath ((</>))
+import System.IO.Unsafe (unsafePerformIO)
 
-configDir :: IO FilePath
-configDir = getHomeDirectory <&> (</> ".ozil")
+-- unsafePerformIO might give wrong results if the person changes
+-- between users in the same session but that seems fairly unlikely
+-- (can you even do that?).
+configDir :: FilePath
+configDir = unsafePerformIO getHomeDirectory </> ".config" </> "ozil"
 
 displayConfigDir :: IsString a => a
-displayConfigDir = "~/.ozil"
+displayConfigDir = "~/.config/ozil"
 
-configFile :: IsString a => a
-configFile = "ozil.yaml"
+configFileName :: IsString a => a
+configFileName = "ozil.yaml"
 
-configFilePath :: IO FilePath
-configFilePath = configDir <&> (</> configFile)
+configPath :: FilePath
+configPath = configDir </> configFileName
 
 displayConfigFilePath :: FilePath
-displayConfigFilePath = displayConfigDir </> configFile
+displayConfigFilePath = displayConfigDir </> configFileName
 
 dbFile :: IsString a => a
 dbFile = "ozil_docpages.sqlite"
 
-dbFilePath :: IO FilePath
-dbFilePath = configDir <&> (</> dbFile)
+dbFilePath :: FilePath
+dbFilePath = configDir </> dbFile
 
 displayDbFilePath :: FilePath
 displayDbFilePath = displayConfigDir </> dbFile
 
-config :: IO Config
-config = do
-  p <- dbFilePath
-  pure Config
+config :: Config
+config =
+  Config
     { _systemInfo = SystemInfo
-      { _ozilConfigDirExists = False
-      , _ozilConfigFileExists = False
-      , _ozilDbExists = False
+      { _ozilConfigFileExists = False
+      , _ozilDbExists = ()
       }
     , _userConfig = UserConfig
       { _helpByDefault = empty
-      , _databasePath = p
+      , _databasePath = ()
       }
     }

@@ -42,6 +42,5 @@ manpathConfigText =
   where
     shrug = " ¯\\_(ツ)_/¯"
 
-manpathConfig :: IO ManpathConfig
-manpathConfig = parseManpathConfig <$> manpathConfigText
-
+manpathConfig :: IO (Maybe ManpathConfig)
+manpathConfig = fmap parseManpathConfig <$> manpathConfigText
