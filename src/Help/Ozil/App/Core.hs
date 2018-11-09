@@ -32,6 +32,8 @@ import Text.Wrap (defaultWrapSettings, preserveIndentation)
 
 import qualified Brick
 import qualified Control.Lens as L
+import qualified Graphics.Vty
+import qualified Graphics.Vty.Input as V
 
 --------------------------------------------------------------------------------
 -- * Environment
@@ -97,10 +99,15 @@ oapp :: OApp
 oapp = Brick.App
   { appDraw = const [ui]
   , appChooseCursor = Brick.showFirstCursor
-  , appHandleEvent = undefined
-  , appStartEvent = undefined
-  , appAttrMap = undefined
+  , appHandleEvent = handleEvent
+  , appStartEvent = pure
+  , appAttrMap = const $ Brick.attrMap Graphics.Vty.defAttr []
   }
+
+handleEvent :: s -> Brick.BrickEvent n1 e -> Brick.EventM n2 (Brick.Next s)
+handleEvent s = \case
+  Brick.VtyEvent (V.EvKey V.KEsc []) -> Brick.halt s
+  _ -> Brick.continue s
 
 ui :: Brick.Widget n
 ui = t1 Brick.<=> Brick.padTop (Brick.Pad 1) t2
