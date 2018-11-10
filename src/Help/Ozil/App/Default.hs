@@ -43,7 +43,7 @@ config :: Config
 config =
   Config
     { _systemInfo = SystemInfo
-      { _ozilConfigFileExists = False
+      { _ozilConfigFileExists = Nothing
       , _ozilDbExists = ()
       }
     , _userConfig = UserConfig

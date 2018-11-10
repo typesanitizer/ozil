@@ -10,7 +10,7 @@ import Control.Lens.TH (makeLenses)
 import Data.Aeson.TH (deriveJSON, defaultOptions, Options (..))
 
 data SystemInfo = SystemInfo
-  { _ozilConfigFileExists :: !Bool
+  { _ozilConfigFileExists :: !(Maybe FilePath)
   , _ozilDbExists :: () -- ^ Unused for now
   } deriving Show
 
@@ -29,5 +29,5 @@ $(deriveJSON defaultOptions{fieldLabelModifier = drop 1} ''UserConfig)
 makeLenses ''UserConfig
 makeLenses ''Config
 
-configFileExists :: Lens' Config Bool
+configFileExists :: Lens' Config (Maybe FilePath)
 configFileExists = systemInfo . ozilConfigFileExists

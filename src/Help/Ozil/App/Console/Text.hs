@@ -1,6 +1,14 @@
-module Help.Ozil.App.Console.Text where
+module Help.Ozil.App.Console.Text
+  ( warn
+  , prompt
+  , DefaultBool
+  , pattern DefaultYes
+  , pattern DefaultNo
+  )
+  where
 
-import Data.Text (Text)
+import Commons
+
 import System.IO (hFlush, stdout)
 
 import qualified Data.Text as T
@@ -9,17 +17,23 @@ import qualified Data.Text.IO as T
 warn :: Text -> IO ()
 warn = T.putStrLn . T.append "Warning: "
 
-prompt :: Bool -> Text -> IO Bool
+newtype DefaultBool = DefaultBool Bool
+
+pattern DefaultYes, DefaultNo :: DefaultBool
+pattern DefaultYes = DefaultBool True
+pattern DefaultNo  = DefaultBool False
+
+prompt :: DefaultBool -> Text -> IO Bool
 prompt def msg = do
   T.putStr fullMsg
   hFlush stdout
-  got <- T.getLine
-  case T.toLower (T.strip got) of
-    ""  -> pure def
+  inp <- T.getLine
+  case T.toLower (T.strip inp) of
+    ""  -> pure (coerce def)
     "y" -> pure True
     "n" -> pure False
-    _ -> T.putStrLn confusedMsg >> prompt def msg
+    _   -> T.putStrLn confusedMsg >> prompt def msg
   where
     confusedMsg = "Didn't quite get what you meant...\n\
                   \ Use one of y/Y/n/N or hit return to use the default value."
-    fullMsg = T.append msg $ if def then " [Y/n] " else " [y/N] "
+    fullMsg = T.append msg $ if coerce def then " [Y/n] " else " [y/N] "

@@ -7,7 +7,6 @@ import Help.Ozil.App.Cmd.Types
 import Options.Applicative
 
 import Data.List.NonEmpty (NonEmpty (..))
-import Data.Semigroup ((<>))
 import System.FilePath (isPathSeparator, takeExtension)
 import Text.Printf (printf)
 
@@ -34,7 +33,7 @@ configPathP :: Parser (Maybe FilePath)
 configPathP =
   optional
     .  option auto
-    $  long "config"
+    $  long "config-path"
     <> short 'c'
     <> help
          (  "Path to config file [default: "
@@ -58,8 +57,8 @@ configOptionsP = subparser
          ( progDesc
            "Alias for \
            \ozil config delete \
-           \&& ozil config init \
-           \&& ozil config sync."
+           \&& ozil conf init \
+           \&& ozil conf sync."
          )
        )
   <> command
@@ -131,7 +130,7 @@ options =
     <*> (hsubparser (configSubP <> whatIsSubP) <|> Default <$> defaultOptionsP)
  where
   configSubP = command
-    "config"
+    "conf"
     ( info (Config <$> configOptionsP) . progDesc $ printf
       "Tweak configuration [%s]. Currently, there is only \
       \one configuration file [%s], but we may add a database in \
@@ -140,7 +139,7 @@ options =
       Default.displayConfigFilePath
     )
   whatIsSubP = command
-    "whatis"
+    "wat"
     ( info (WhatIs <$> whatIsOptionsP)
     . progDesc
     $ "Search man page sections [default: Names only, like whatis(1)]. \

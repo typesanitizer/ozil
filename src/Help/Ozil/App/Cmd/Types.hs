@@ -73,8 +73,8 @@ data WhatIsOptions = WhatIsOptions
 -- | Subcommand under use.
 data Command
   = Config !ConfigOptions
-  | Default !DefaultOptions
-  | WhatIs !WhatIsOptions
+  | Default !DefaultOptions -- ^ Default ==> run viewer
+  | WhatIs !WhatIsOptions   -- ^ WhatIs equivalent
   -- | Db !DbOptions
   deriving Show
 

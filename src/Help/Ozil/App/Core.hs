@@ -10,6 +10,7 @@ module Help.Ozil.App.Core
   , OResource (..)
   , OState
   , HasText (..)
+  , config
   , watch
   , getOptions
   , getBChan
@@ -26,8 +27,6 @@ import qualified Help.Ozil.App.Default as Default
 
 import Brick (App (..))
 import Brick.BChan (BChan)
-
-import qualified Control.Lens as L
 
 --------------------------------------------------------------------------------
 -- * GUI
@@ -63,9 +62,9 @@ getBChan = oStateChan
 newOState :: Options -> WatchManager -> BChan OEvent -> OState
 newOState opts wm ch = OState
   { oStateOptions = opts
-  , _oStateConfig  = Default.config
-  , _oStateText    = dummyText
-  , _oStateWatch   = Uninitialized wm
+  , _oStateConfig = Default.config
+  , _oStateText   = dummyText
+  , _oStateWatch  = Uninitialized wm
   , oStateChan    = ch
   }
 

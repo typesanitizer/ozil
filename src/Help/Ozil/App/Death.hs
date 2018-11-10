@@ -1,10 +1,9 @@
 module Help.Ozil.App.Death where
 
-import Control.Monad.IO.Class (MonadIO (..))
-import System.Exit (die)
+import Commons
 
-oDie :: MonadIO m => String -> m a
-oDie = liftIO . die
+oDie :: (HasCallStack, MonadIO m) => String -> m a
+oDie = liftIO . error
 
 unreachableErrorM :: MonadIO m => m a
 unreachableErrorM = oDie "Unreachable code!"
@@ -12,8 +11,8 @@ unreachableErrorM = oDie "Unreachable code!"
 unreachableError :: a
 unreachableError = error "Unreachable code!"
 
-unimplementedErrorM :: MonadIO m => m a
+unimplementedErrorM :: (HasCallStack, MonadIO m) => m a
 unimplementedErrorM = oDie "Unimplemented :("
 
-unimplementedError :: a
+unimplementedError :: HasCallStack => a
 unimplementedError = error "Unimplemented :("

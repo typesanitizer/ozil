@@ -1,69 +1,140 @@
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE FunctionalDependencies     #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Help.Ozil.App.Startup
-  (
-  -- Startup
-    Startup (..)
-  -- , runO
-  , evalO
-  -- , execO
-  -- Environment
-  , Env
-  -- , options
-  -- , config
-  , showEnv
-  , modifyConfig
+  ( finishStartup
+  , SaveSelection
+  , pattern SaveSelection
+  , pattern DontSaveSelection
   ) where
 
 import Commons
 
-import Help.Ozil.App.Config.Types (Config (..))
-import Help.Ozil.App.Cmd (Command, HasOptCommand (..), Options)
+import Help.Ozil.App.Cmd
+import Help.Ozil.App.Config (getConfig)
+import Help.Ozil.App.Death
+import Help.Ozil.App.Startup.Core
 
-import Control.Monad.Reader (ask, MonadReader, ReaderT, runReaderT)
-import Data.IORef (newIORef, readIORef, modifyIORef, IORef)
+import Help.Page (DocPage (..), ManPageInfo (..), HelpPageInfo (..))
+import Help.Page.Help (HelpPage (..))
+import Help.Ozil.App.Config.Types (Config)
 
---------------------------------------------------------------------------------
--- * The Startup monad.
+import qualified Help.Ozil.App.Default as Default
 
--- | Everything in the app runs inside the Startup monad.
-newtype Startup a = Startup { unO :: ReaderT Env IO a}
-  deriving (Functor, Applicative, Monad, MonadReader Env, MonadIO)
+import System.Exit (ExitCode (..))
+import System.FilePath (dropExtension)
+import System.Process (readProcessWithExitCode)
 
-runO :: Options -> Config -> Startup a -> IO (a, Config)
-runO o c ma = do
-  env <- Env o <$> newIORef c
-  a <- runReaderT (unO ma) env
-  c' <- readIORef (_envConfig env)
-  pure (a, c')
-
-evalO :: Options -> Config -> Startup a -> IO a
-evalO a b c = fst <$> runO a b c
-
--- execO :: Options -> Config -> Startup a -> IO Config
--- execO a b c = snd <$> runO a b c
+import qualified Control.Lens as L
+import qualified Data.Text as T
 
 --------------------------------------------------------------------------------
--- * Environment
+-- * Exports
 
-data Env = Env
-  { _envOptions :: Options
-  , _envConfig :: IORef Config
-  }
-makeFields ''Env
+-- | Run the startup "application", returning the docpage to be views and the
+-- proper configuration.
+--
+-- NOTE: This function might kill the application because we actually don't want
+-- to view any documents at all.
+finishStartup :: Options -> IO ((DocPage, SaveSelection), Config)
+finishStartup o = runStartup o Default.config (getConfig >> selectPages)
 
-instance HasOptCommand Env Command where
-  optCommand = options . optCommand
+--------------------------------------------------------------------------------
 
-showEnv :: Startup String
-showEnv = liftIO . showEnv' =<< ask
+selectPages :: HasCallStack => Startup (DocPage, SaveSelection)
+selectPages = do
+  liftIO $ print "getting mp"
+  mp <- getManPages
+  liftIO $ print "getting hp"
+  hp <- getHelpPages
+  liftIO $ print "run selection"
+  userSelection mp hp
 
-showEnv' :: Env -> IO String
-showEnv' (Env a b) = (show a ++) . show <$> readIORef b
+getManPages :: HasCallStack => Startup [ManPageInfo]
+getManPages = do
+  cmd <- L.view optCommand
+  case cmd ^? _Default.inputs of
+    Nothing -> pure mempty
+    Just (_ :| _ : _) -> unreachableError
+    Just (InputPath{} :| []) -> unimplementedErrorM
+    Just (p@InputFile{} :| []) ->
+      liftIO $ do
+      -- FIXME: whatis may not recognize everything, so we might actually need
+      -- to run man as well
+      (ecode, out, _) <- readProcessWithExitCode "whatis" ["-w", go p] ""
+      pure $ case ecode of
+        ExitFailure _ -> []
+        ExitSuccess   -> map ManPageInfo (lines out)
+        -- ^ No need to parse it right away.
+  where
+    go InputPath{} = unimplementedError
+    go (InputFile ty name) = case ty of
+      Binary -> name
+      ManPage Unzipped -> dropExtension name
+      ManPage Zipped -> dropExtension (dropExtension name)
 
-modifyConfig :: (Config -> Config) -> Startup ()
-modifyConfig f = do
-  c <- view config
-  liftIO $ modifyIORef c f
+-- TODO: Extend this to allow for multiple help pages.
+-- For example, if you're working on something which you also install
+-- globally, then running
+-- @stack exec foo -- --help@ VS @foo --help@
+-- may give different results.
+getHelpPages :: HasCallStack => Startup [HelpPageInfo]
+getHelpPages = do
+  cmd <- L.view optCommand
+  case cmd ^? _Default.inputs of
+    Nothing -> pure mempty
+    Just (_ :| _ : _) -> unreachableErrorM
+    Just (p :| []) -> case p of
+      InputFile ManPage{} _ -> pure []
+      InputFile Binary name -> liftIO $ do
+        (ecode, out, _) <- readProcessWithExitCode "which" [name] ""
+        pure $ case ecode of
+          ExitFailure _ -> []
+          ExitSuccess   -> map HelpPageInfo (lines out)
+      InputPath{} -> unimplementedErrorM
+
+newtype SaveSelection = MkSaveSelection Bool
+
+pattern SaveSelection, DontSaveSelection :: SaveSelection
+pattern SaveSelection = MkSaveSelection True
+pattern DontSaveSelection = MkSaveSelection False
+
+-- |
+--
+-- TODO: Create a simple Brick app to let the user pick what they want.
+-- Further, ask them if they'd like you to save that default for future
+-- operations. autoSelection is only used as a stop-gap solution.
+userSelection
+  :: [ManPageInfo] -> [HelpPageInfo] -> Startup (DocPage, SaveSelection)
+userSelection = autoSelection
+
+autoSelection
+  :: [ManPageInfo] -> [HelpPageInfo] -> Startup (DocPage, SaveSelection)
+autoSelection ms hs = liftIO $ (, DontSaveSelection) <$>
+  case ms of
+    m:_ -> retrieveManPage m
+    []  -> case hs of
+      h:_ -> retrieveHelpPage h
+      []  -> error "Error: Couldn't find a man page or help page."
+      -- TODO: Improve this error. For starters, we should pluck out the name of
+      -- the input from the monad.
+
+retrieveManPage :: ManPageInfo -> IO DocPage
+retrieveManPage = undefined
+
+retrieveHelpPage :: HelpPageInfo -> IO DocPage
+retrieveHelpPage (HelpPageInfo binpath) = do
+  (ecode, out, _) <- readProcessWithExitCode binpath ["--help"] ""
+  case ecode of
+    ExitSuccess   -> pure . LongHelp . parseLongHelp $ T.pack out
+    ExitFailure _ -> do
+      (ecode', out', _) <- readProcessWithExitCode binpath ["-h"] ""
+      case ecode' of
+        ExitSuccess -> pure . ShortHelp . parseShortHelp $ T.pack out'
+        ExitFailure _ -> error "Error: The thing doesn't have a help page..."
+        -- TODO: Improve this error.
+  where
+    -- TODO: Improve this...
+    parseLongHelp txt = HelpPage
+      { _helpPageHeading = Nothing
+      , _helpPageSynopsis = Nothing
+      , _helpPageRest = txt
+      }
+    parseShortHelp = parseLongHelp
