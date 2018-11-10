@@ -4,6 +4,7 @@ module Help.Ozil.App.Config
   ( getConfig
   , saveConfig
   , module Help.Ozil.App.Config.Watch
+  , Conf.Config
   )
   where
 

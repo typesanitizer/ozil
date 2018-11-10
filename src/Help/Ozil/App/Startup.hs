@@ -7,14 +7,12 @@ module Help.Ozil.App.Startup
 
 import Commons
 
+import Help.Page
 import Help.Ozil.App.Cmd
-import Help.Ozil.App.Config (getConfig)
 import Help.Ozil.App.Death
 import Help.Ozil.App.Startup.Core
 
-import Help.Page (DocPage (..), ManPageInfo (..), HelpPageInfo (..))
-import Help.Page.Help (HelpPage (..))
-import Help.Ozil.App.Config.Types (Config)
+import Help.Ozil.App.Config (getConfig, Config)
 
 import qualified Help.Ozil.App.Default as Default
 
@@ -130,11 +128,3 @@ retrieveHelpPage (HelpPageInfo binpath) = do
         ExitSuccess -> pure . ShortHelp . parseShortHelp $ T.pack out'
         ExitFailure _ -> error "Error: The thing doesn't have a help page..."
         -- TODO: Improve this error.
-  where
-    -- TODO: Improve this...
-    parseLongHelp txt = HelpPage
-      { _helpPageHeading = Nothing
-      , _helpPageSynopsis = Nothing
-      , _helpPageRest = txt
-      }
-    parseShortHelp = parseLongHelp

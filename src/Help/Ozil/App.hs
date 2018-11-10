@@ -8,6 +8,7 @@ import Help.Ozil.App.Core
 import Help.Ozil.App.Config (FSEvent, toReactOrNotToReact)
 import Help.Ozil.App.Startup (finishStartup)
 
+import qualified Help.Page as Page
 import qualified Help.Ozil.App.Default as Default
 
 import Brick (App (..))
@@ -59,11 +60,12 @@ ozilStartEvent s = case s ^. watch of
     -- Tell user that you made a directory :)
     -- Pause for a bit so they can read the message :)
     -- Go ahead.
-    (_, config', sw) <- liftIO $ do
-      (dp, config') <- finishStartup (getOptions s)
+    (dp, config', sw) <- liftIO $ do
+      ((dp, _), config') <- finishStartup (getOptions s)
       sw <- FSNotify.watchDir wm Default.configDir toReactOrNotToReact forwardEvent
       pure (dp, config', sw)
     pure $ s
+      & set text (Page.render dp)
       & set watch (Running sw)
       & set config config'
   where
