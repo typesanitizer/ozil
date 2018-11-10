@@ -1,12 +1,15 @@
 module Help.Ozil.App.Config.Watch
   ( toReactOrNotToReact
+  , FSEvent
   , module System.FSNotify
   )
   where
 
-import System.FSNotify (Event (..), ActionPredicate)
+import System.FSNotify (WatchManager, Event (..), ActionPredicate)
 
 import qualified Help.Ozil.App.Default as Default
+
+type FSEvent = Event
 
 -- | That is the question.
 toReactOrNotToReact :: ActionPredicate

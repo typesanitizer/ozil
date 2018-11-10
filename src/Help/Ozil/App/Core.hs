@@ -3,43 +3,46 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Help.Ozil.App.Core
-  ( O (..)
-  , Env
+  (
+  -- Environment
+    Env
   , options
   , config
   , showEnv
   , modifyConfig
+  -- Startup
+  , Startup (..)
   , runO
   , evalO
   , execO
+  -- Core app
   , OApp
+  , OWatch (..)
   , OEvent (..)
-  , OState (..)
-  , initState
   , OResource (..)
-  , oapp
+  , OState
+  , HasText (..)
+  , watch
+  , getOptions
+  , getBChan
+  , newOState
   ) where
 
-import Help.Ozil.App.Config.Watch (toReactOrNotToReact, Event)
+import Help.Ozil.App.Config.Watch
 import Help.Ozil.App.Config.Types (Config (..))
 import Help.Ozil.App.Cmd (Command, HasOptCommand(..), Options)
 
 import qualified Help.Ozil.App.Default as Default
 
 import Brick (App (..))
+import Brick.BChan (BChan)
 import Control.Lens.TH (makeFields)
-import Control.Monad (when)
 import Control.Monad.Reader (ask, MonadReader, ReaderT, runReaderT)
 import Control.Monad.IO.Class
 import Data.IORef (newIORef, readIORef, modifyIORef, IORef)
 import Data.Text (Text)
 
-import qualified Brick
-import qualified Brick.Widgets.Border as Border
 import qualified Control.Lens as L
-import qualified Graphics.Vty
-import qualified Graphics.Vty.Input as V
-import qualified System.FSNotify as FSNotify
 
 --------------------------------------------------------------------------------
 -- * Environment
@@ -53,130 +56,76 @@ makeFields ''Env
 instance HasOptCommand Env Command where
   optCommand = options . optCommand
 
-showEnv :: O String
+showEnv :: Startup String
 showEnv = liftIO . showEnv' =<< ask
 
 showEnv' :: Env -> IO String
 showEnv' (Env a b) = (show a ++) . show <$> readIORef b
 
-modifyConfig :: (Config -> Config) -> O ()
+modifyConfig :: (Config -> Config) -> Startup ()
 modifyConfig f = do
   c <- L.view config
   liftIO $ modifyIORef c f
 
 --------------------------------------------------------------------------------
--- * The O monad.
+-- * The Startup monad.
 
--- | Everything in the app runs inside the O monad.
-newtype O a = O { unO :: ReaderT Env IO a}
+-- | Everything in the app runs inside the Startup monad.
+newtype Startup a = Startup { unO :: ReaderT Env IO a}
   deriving (Functor, Applicative, Monad, MonadReader Env, MonadIO)
 
-runO :: Options -> Config -> O a -> IO (a, Config)
+runO :: Options -> Config -> Startup a -> IO (a, Config)
 runO o c ma = do
   env <- Env o <$> newIORef c
   a <- runReaderT (unO ma) env
   c' <- readIORef (_envConfig env)
   pure (a, c')
 
-evalO :: Options -> Config -> O a -> IO a
+evalO :: Options -> Config -> Startup a -> IO a
 evalO a b c = fst <$> runO a b c
 
-execO :: Options -> Config -> O a -> IO Config
+execO :: Options -> Config -> Startup a -> IO Config
 execO a b c = snd <$> runO a b c
 
 --------------------------------------------------------------------------------
 -- * GUI
 
-newtype OEvent = OEvent Event
-
-data OWatch
-  = Uninitialized !FSNotify.WatchManager
-  | Started !(IO ())
-
-data OState = OState
-  { _ostateEnv   :: !Env
-  , _ostateText  :: !Text
-  , _ostateWatch :: !OWatch
-  }
-
-initState :: Options -> FSNotify.WatchManager -> OState
-initState opts wm = OState
-  { _ostateEnv   = Env { _envOptions = opts, _envConfig = undefined }
-  , _ostateText  = dummyText
-  , _ostateWatch = Uninitialized wm
-  }
-
-newtype OResource = OResource Int
-  deriving (Eq, Ord, Show)
-
 type OApp = Brick.App OState OEvent OResource
 
-oapp :: OApp
-oapp = Brick.App
-  { appDraw = \s -> [ui s]
-  , appChooseCursor = Brick.showFirstCursor
-  , appHandleEvent = handleEvent
-  , appStartEvent = ozilStartEvent
-  , appAttrMap = const $ Brick.attrMap Graphics.Vty.defAttr []
+newtype OEvent = OEvent FSEvent
+
+data OResource
+  = TextViewport
+  | KeyBindingsViewport
+  deriving (Eq, Ord, Show)
+
+data OWatch
+  = Uninitialized !WatchManager
+  | Running       !(IO ()) -- ^ Action to stop the watch
+
+data OState = OState
+  { oStateOptions :: !Options
+  , _oStateConfig  :: !Config
+  , _oStateText    :: !Text
+  , _oStateWatch   :: !OWatch
+  , oStateChan    :: !(BChan OEvent)
   }
+makeFields ''OState
 
-ozilStartEvent :: OState -> Brick.EventM OResource OState
-ozilStartEvent s = case _ostateWatch s of
-  Started _ -> pure s
-  Uninitialized wm -> do
-    -- TODO: Write path creating logic
-    -- mkdir with parents
-    -- Tell user that you made a directory :)
-    -- Pause for a bit so they can read the message :)
-    -- Go ahead.
-    sw <- liftIO (FSNotify.watchDir wm Default.configDir toReactOrNotToReact writeToChan)
-    pure (s { _ostateWatch = Started sw})
-  where
-    writeToChan :: Event -> IO ()
-    writeToChan = undefined
+getOptions :: OState -> Options
+getOptions = oStateOptions
 
-handleEvent :: OState -> Brick.BrickEvent n e -> Brick.EventM OResource (Brick.Next OState)
-handleEvent s = \case
-  Brick.VtyEvent (V.EvKey V.KEsc []) -> do
-    case _ostateWatch s of
-      Started stopWatch -> liftIO stopWatch
-      Uninitialized _ -> pure ()
-    Brick.halt s
-  ev -> do
-    let
-      scrollAmt = case ev of
-        Brick.VtyEvent (V.EvKey V.KDown []) ->  1
-        Brick.VtyEvent (V.EvKey V.KUp   []) -> -1
-        _ -> 0
-    when (scrollAmt /= 0)
-      $ Brick.vScrollBy (Brick.viewportScroll (OResource 10)) scrollAmt
-    Brick.continue s
+getBChan :: OState -> BChan OEvent
+getBChan = oStateChan
 
--- The UI should look like
---
--- +------ binaryname ------+
--- |                        |
--- | blah                   |
--- |                        |
--- | blah                   |
--- |                        |
--- | blah                   |
--- |                        |
--- +------------------------+
--- | ESC = Exit             |
--- +------------------------+
---
--- ui :: (Show n, Ord n) => Brick.Widget n
-ui :: OState -> Brick.Widget OResource
-ui s = Border.borderWithLabel (Brick.str " binaryname ") $
-  body
-  Brick.<=>
-  Border.hBorder
-  Brick.<=>
-  Brick.txt "ESC = Exit"
-  where
-    body = Brick.visible
-        (Brick.viewport (OResource 10) Brick.Vertical (Brick.txtWrap (_ostateText s)))
+newOState :: Options -> WatchManager -> BChan OEvent -> OState
+newOState opts wm ch = OState
+  { oStateOptions = opts
+  , _oStateConfig  = Default.config
+  , _oStateText    = dummyText
+  , _oStateWatch   = Uninitialized wm
+  , oStateChan    = ch
+  }
 
 dummyText :: Text
 dummyText =

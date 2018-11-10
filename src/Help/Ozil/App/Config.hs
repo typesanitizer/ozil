@@ -27,7 +27,7 @@ import qualified Data.ByteString as BS
 import qualified Help.Ozil.App.Default as Default
 import qualified Help.Ozil.App.Config.Types as Conf
 
-getConfig :: O ()
+getConfig :: Startup ()
 getConfig =
   foundConfigFile
     >>= deleteConfigFileIfApplicable
@@ -36,7 +36,7 @@ getConfig =
     >>  checkDbExists
     >>= syncDbIfApplicable
 
-foundConfigFile :: O OzilFileExists
+foundConfigFile :: Startup OzilFileExists
 foundConfigFile = do
   b <- liftIO (doesFileExist Default.configPath)
   modifyConfig (L.set Conf.configFileExists b)
@@ -46,10 +46,10 @@ data OzilFileExists = OzilFileMissing | OzilFileExists
 
 exists :: L.Iso' Bool OzilFileExists
 exists = L.iso
-  (\case {False -> OzilFileMissing; True -> OzilFileExists})
-  (\case {OzilFileMissing -> False; OzilFileExists -> True})
+  (\case False -> OzilFileMissing; True -> OzilFileExists)
+  (\case OzilFileMissing -> False; OzilFileExists -> True)
 
-deleteConfigFileIfApplicable :: OzilFileExists -> O OzilFileExists
+deleteConfigFileIfApplicable :: OzilFileExists -> Startup OzilFileExists
 deleteConfigFileIfApplicable ozilFileExists = L.view optCommand >>= \case
   Config ConfigDelete -> delete *> liftIO exitSuccess
   Config ConfigReInit -> delete *> pure OzilFileMissing
@@ -62,7 +62,7 @@ deleteConfigFileIfApplicable ozilFileExists = L.view optCommand >>= \case
     liftIO $ removePathForcibly Default.configPath
     modifyConfig (L.set Conf.configFileExists False)
 
-createConfigFileIfApplicable :: OzilFileExists -> O OzilFileExists
+createConfigFileIfApplicable :: OzilFileExists -> Startup OzilFileExists
 createConfigFileIfApplicable ozilFileExists = L.view optCommand >>= \case
   Default{}           -> promptInit
   WhatIs{}            -> pure ozilFileExists
@@ -77,7 +77,7 @@ createConfigFileIfApplicable ozilFileExists = L.view optCommand >>= \case
       create <- liftIO $ prompt True promptMsg
       when create (initAction unreachableError)
       pure (create ^. exists)
-  initAction :: (forall a. O a) -> O ()
+  initAction :: (forall a. Startup a) -> Startup ()
   initAction death = case ozilFileExists of
     OzilFileExists  -> death
     OzilFileMissing -> do
@@ -91,7 +91,7 @@ createConfigFileIfApplicable ozilFileExists = L.view optCommand >>= \case
       \Maybe you wanted to use ozil config reinit?"
   promptMsg = "Configuration file not found. Should I initialize one?"
 
-readWriteConfig :: OzilFileExists -> O ()
+readWriteConfig :: OzilFileExists -> Startup ()
 readWriteConfig = \case
   OzilFileMissing -> undefined
   OzilFileExists  -> L.view optCommand >>= \case
@@ -111,14 +111,14 @@ readWriteConfig = \case
   configDecodeWarning s = T.pack $
     printf "Couldn't parse the config file %s.\n%s" Default.configPath s
 
-checkDbExists :: O Bool
+checkDbExists :: Startup Bool
 checkDbExists = pure True
 -- checkDbExists = do
 --   p <- L.use (Conf.userConfig . Conf.databasePath)
 --   (Conf.systemInfo . Conf.ozilDbExists) <~= liftIO (doesFileExist p)
 
-syncDbIfApplicable :: Bool -> O ()
+syncDbIfApplicable :: Bool -> Startup ()
 syncDbIfApplicable _ = pure ()
 
-saveConfig :: O ()
+saveConfig :: Startup ()
 saveConfig = undefined

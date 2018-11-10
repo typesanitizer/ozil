@@ -4,21 +4,27 @@ import Help.Ozil.App.Cmd
 import Help.Ozil.App.Death
 
 import Help.Page (DocPage, ManPageInfo (..), HelpPageInfo (..))
-import Help.Ozil.App.Core (initState, oapp, evalO, O, OApp)
-import Help.Ozil.App.Config (saveConfig, getConfig, toReactOrNotToReact)
+import Help.Ozil.App.Core
+  ( HasText (..), getBChan, watch, OResource (..), OState, OEvent (..)
+  , newOState, evalO, Startup, OApp, OWatch (..)
+  )
+import Help.Ozil.App.Config (FSEvent, saveConfig, getConfig, toReactOrNotToReact)
 
 import qualified Help.Ozil.App.Default as Default
 
-import Brick.BChan (BChan)
-import Control.Lens ((^?))
-import Control.Monad (void, join)
+import Brick (App (..))
+import Control.Lens ((^?), (^.))
+import Control.Monad (when, void, join)
 import Control.Monad.IO.Class
+import Data.Function ((&))
+import Data.Text (Text)
 import System.Exit (ExitCode (..))
 import System.FilePath (dropExtension)
 import System.Process (readProcessWithExitCode)
 
 import qualified Brick
 import qualified Brick.BChan as BChan
+import qualified Brick.Widgets.Border as Border
 import qualified Control.Lens as L
 import qualified Graphics.Vty as Vty
 import qualified System.FSNotify as FSNotify
@@ -26,10 +32,10 @@ import qualified System.FSNotify as FSNotify
 main :: IO ()
 main = defaultMain $ \opts -> FSNotify.withManager $ \wm -> do
   chan <- BChan.newBChan maxChanSize
-  saveState $ Brick.customMain gui (Just chan) oapp (initState opts wm)
+  saveState $ Brick.customMain gui (Just chan) oapp (newOState opts wm chan)
   where
     gui = Vty.mkVty Vty.defaultConfig
-    maxChanSize = 10
+    maxChanSize = 20
     saveState = void
 
 runOzil :: Options -> IO (FSNotify.WatchManager -> IO ())
@@ -41,10 +47,10 @@ runOzil opts = pure $ \wm ->
       >>= viewPages event
       >>  saveConfig
 
-selectPages :: O a
+selectPages :: Startup a
 selectPages = userSelection <$> getManPages <*> getHelpPages
 
-getManPages :: O [ManPageInfo]
+getManPages :: Startup [ManPageInfo]
 getManPages = do
   cmd <- L.view optCommand
   case cmd ^? _Default.inputs of
@@ -70,7 +76,7 @@ getManPages = do
 -- globally, then running
 -- @stack exec foo -- --help@ VS @foo --help@
 -- may give different results.
-getHelpPages :: O [HelpPageInfo]
+getHelpPages :: Startup [HelpPageInfo]
 getHelpPages = do
   cmd <- L.view optCommand
   case cmd ^? _Default.inputs of
@@ -90,7 +96,79 @@ getHelpPages = do
 userSelection :: a
 userSelection = unimplementedError
 
-viewPages :: FSNotify.Event -> [DocPage] -> O ()
+viewPages :: FSNotify.Event -> [DocPage] -> Startup ()
 viewPages = unimplementedError
 -- viewPage :: Options -> DocPage -> IO ()
 -- viewPage = undefined
+
+oapp :: OApp
+oapp = Brick.App
+  { appDraw = \s -> [ui s]
+  , appChooseCursor = Brick.showFirstCursor
+  , appHandleEvent = handleEvent
+  , appStartEvent = ozilStartEvent
+  , appAttrMap = const $ Brick.attrMap Vty.defAttr []
+  }
+
+ozilStartEvent :: OState -> Brick.EventM OResource OState
+ozilStartEvent s = case s ^. watch of
+  Running _ -> pure s
+  Uninitialized wm -> do
+    -- TODO: Write path creating logic
+    -- mkdir with parents
+    -- Tell user that you made a directory :)
+    -- Pause for a bit so they can read the message :)
+    -- Go ahead.
+    sw <- liftIO
+      (FSNotify.watchDir wm Default.configDir toReactOrNotToReact forwardEvent)
+    pure (L.set watch (Running sw) s)
+  where
+    forwardEvent :: FSEvent -> IO ()
+    forwardEvent = BChan.writeBChan (getBChan s) . OEvent
+
+handleEvent
+  :: OState
+  -> Brick.BrickEvent n OEvent
+  -> Brick.EventM OResource (Brick.Next OState)
+handleEvent s = \case
+  Brick.VtyEvent (Vty.EvKey Vty.KEsc []) -> do
+    case s ^. watch of
+      Running stopWatch -> liftIO stopWatch
+      Uninitialized _ -> pure ()
+    Brick.halt s
+  ev -> do
+    let
+      scrollAmt = case ev of
+        Brick.VtyEvent (Vty.EvKey Vty.KDown []) ->  1
+        Brick.VtyEvent (Vty.EvKey Vty.KUp   []) -> -1
+        _ -> 0
+    when (scrollAmt /= 0)
+      $ Brick.vScrollBy (Brick.viewportScroll TextViewport) scrollAmt
+    Brick.continue s
+
+-- The UI should look like
+--
+-- +------ binaryname ------+
+-- |                        |
+-- | blah                   |
+-- |                        |
+-- | blah                   |
+-- |                        |
+-- | blah                   |
+-- |                        |
+-- +------------------------+
+-- | ESC = Exit             |
+-- +------------------------+
+--
+-- ui :: (Show n, Ord n) => Brick.Widget n
+ui :: HasText s Text => s -> Brick.Widget OResource
+ui s = Border.borderWithLabel (Brick.str " binaryname ") $
+  body
+  Brick.<=>
+  Border.hBorder
+  Brick.<=>
+  Brick.txt "ESC = Exit"
+  where
+    body = s ^. text
+      & Brick.txtWrap
+      & Brick.viewport TextViewport Brick.Vertical
