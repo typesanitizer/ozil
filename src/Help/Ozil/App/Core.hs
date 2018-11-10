@@ -1,22 +1,10 @@
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE FunctionalDependencies     #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Help.Ozil.App.Core
   (
-  -- Environment
-    Env
-  , options
-  , config
-  , showEnv
-  , modifyConfig
-  -- Startup
-  , Startup (..)
-  , runO
-  , evalO
-  , execO
   -- Core app
-  , OApp
+    OApp
   , OWatch (..)
   , OEvent (..)
   , OResource (..)
@@ -28,64 +16,18 @@ module Help.Ozil.App.Core
   , newOState
   ) where
 
+import Commons
+
 import Help.Ozil.App.Config.Watch
-import Help.Ozil.App.Config.Types (Config (..))
-import Help.Ozil.App.Cmd (Command, HasOptCommand(..), Options)
+import Help.Ozil.App.Config.Types (Config)
+import Help.Ozil.App.Cmd (Options)
 
 import qualified Help.Ozil.App.Default as Default
 
 import Brick (App (..))
 import Brick.BChan (BChan)
-import Control.Lens.TH (makeFields)
-import Control.Monad.Reader (ask, MonadReader, ReaderT, runReaderT)
-import Control.Monad.IO.Class
-import Data.IORef (newIORef, readIORef, modifyIORef, IORef)
-import Data.Text (Text)
 
 import qualified Control.Lens as L
-
---------------------------------------------------------------------------------
--- * Environment
-
-data Env = Env
-  { _envOptions :: Options
-  , _envConfig :: IORef Config
-  }
-makeFields ''Env
-
-instance HasOptCommand Env Command where
-  optCommand = options . optCommand
-
-showEnv :: Startup String
-showEnv = liftIO . showEnv' =<< ask
-
-showEnv' :: Env -> IO String
-showEnv' (Env a b) = (show a ++) . show <$> readIORef b
-
-modifyConfig :: (Config -> Config) -> Startup ()
-modifyConfig f = do
-  c <- L.view config
-  liftIO $ modifyIORef c f
-
---------------------------------------------------------------------------------
--- * The Startup monad.
-
--- | Everything in the app runs inside the Startup monad.
-newtype Startup a = Startup { unO :: ReaderT Env IO a}
-  deriving (Functor, Applicative, Monad, MonadReader Env, MonadIO)
-
-runO :: Options -> Config -> Startup a -> IO (a, Config)
-runO o c ma = do
-  env <- Env o <$> newIORef c
-  a <- runReaderT (unO ma) env
-  c' <- readIORef (_envConfig env)
-  pure (a, c')
-
-evalO :: Options -> Config -> Startup a -> IO a
-evalO a b c = fst <$> runO a b c
-
-execO :: Options -> Config -> Startup a -> IO Config
-execO a b c = snd <$> runO a b c
 
 --------------------------------------------------------------------------------
 -- * GUI
@@ -105,9 +47,9 @@ data OWatch
 
 data OState = OState
   { oStateOptions :: !Options
-  , _oStateConfig  :: !Config
-  , _oStateText    :: !Text
-  , _oStateWatch   :: !OWatch
+  , _oStateConfig :: !Config
+  , _oStateText   :: !Text
+  , _oStateWatch  :: !OWatch
   , oStateChan    :: !(BChan OEvent)
   }
 makeFields ''OState

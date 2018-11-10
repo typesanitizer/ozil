@@ -6,9 +6,10 @@ import Help.Ozil.App.Death
 import Help.Page (DocPage, ManPageInfo (..), HelpPageInfo (..))
 import Help.Ozil.App.Core
   ( HasText (..), getBChan, watch, OResource (..), OState, OEvent (..)
-  , newOState, evalO, Startup, OApp, OWatch (..)
+  , newOState, OApp, OWatch (..)
   )
 import Help.Ozil.App.Config (FSEvent, saveConfig, getConfig, toReactOrNotToReact)
+import Help.Ozil.App.Startup (Startup, evalO)
 
 import qualified Help.Ozil.App.Default as Default
 
@@ -37,6 +38,15 @@ main = defaultMain $ \opts -> FSNotify.withManager $ \wm -> do
     gui = Vty.mkVty Vty.defaultConfig
     maxChanSize = 20
     saveState = void
+
+oapp :: OApp
+oapp = Brick.App
+  { appDraw = \s -> [ui s]
+  , appChooseCursor = Brick.showFirstCursor
+  , appHandleEvent = handleEvent
+  , appStartEvent = ozilStartEvent
+  , appAttrMap = const $ Brick.attrMap Vty.defAttr []
+  }
 
 runOzil :: Options -> IO (FSNotify.WatchManager -> IO ())
 runOzil opts = pure $ \wm ->
@@ -100,15 +110,6 @@ viewPages :: FSNotify.Event -> [DocPage] -> Startup ()
 viewPages = unimplementedError
 -- viewPage :: Options -> DocPage -> IO ()
 -- viewPage = undefined
-
-oapp :: OApp
-oapp = Brick.App
-  { appDraw = \s -> [ui s]
-  , appChooseCursor = Brick.showFirstCursor
-  , appHandleEvent = handleEvent
-  , appStartEvent = ozilStartEvent
-  , appAttrMap = const $ Brick.attrMap Vty.defAttr []
-  }
 
 ozilStartEvent :: OState -> Brick.EventM OResource OState
 ozilStartEvent s = case s ^. watch of
