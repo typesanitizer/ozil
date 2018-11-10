@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-
 module Help.Ozil.App where
 
 import Help.Ozil.App.Cmd
@@ -26,7 +24,7 @@ import qualified Graphics.Vty as Vty
 import qualified System.FSNotify as FSNotify
 
 main :: IO ()
-main = defaultMain $ \opts -> FSNotify.withManager $ \wm -> do
+main = defaultMain $ \opts -> FSNotify.withManager $ \_ -> do
   chan <- BChan.newBChan maxChanSize
   -- stopWatch <- FSNotify.watchDir wm Default.configDir toReactOrNotToReact writeToChan
   saveState $ Brick.customMain gui (Just chan) oapp (initState opts)
@@ -35,8 +33,8 @@ main = defaultMain $ \opts -> FSNotify.withManager $ \wm -> do
     gui = Vty.mkVty Vty.defaultConfig
     initState = undefined
     maxChanSize = 10
-    writeToChan :: FSNotify.Event -> IO ()
-    writeToChan = undefined
+    -- writeToChan :: FSNotify.Event -> IO ()
+    -- writeToChan = undefined
     saveState = void
 
 runOzil :: Options -> IO (FSNotify.WatchManager -> IO ())
