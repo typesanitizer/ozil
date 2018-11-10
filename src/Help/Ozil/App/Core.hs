@@ -15,26 +15,31 @@ module Help.Ozil.App.Core
   , OApp
   , OEvent (..)
   , OState (..)
+  , initState
   , OResource (..)
   , oapp
   ) where
 
-import Help.Ozil.App.Config.Watch (Event)
+import Help.Ozil.App.Config.Watch (toReactOrNotToReact, Event)
 import Help.Ozil.App.Config.Types (Config (..))
 import Help.Ozil.App.Cmd (Command, HasOptCommand(..), Options)
 
+import qualified Help.Ozil.App.Default as Default
+
 import Brick (App (..))
 import Control.Lens.TH (makeFields)
+import Control.Monad (when)
 import Control.Monad.Reader (ask, MonadReader, ReaderT, runReaderT)
 import Control.Monad.IO.Class
 import Data.IORef (newIORef, readIORef, modifyIORef, IORef)
-import Text.Wrap (defaultWrapSettings, preserveIndentation)
+import Data.Text (Text)
 
 import qualified Brick
 import qualified Brick.Widgets.Border as Border
 import qualified Control.Lens as L
 import qualified Graphics.Vty
 import qualified Graphics.Vty.Input as V
+import qualified System.FSNotify as FSNotify
 
 --------------------------------------------------------------------------------
 -- * Environment
@@ -64,12 +69,7 @@ modifyConfig f = do
 
 -- | Everything in the app runs inside the O monad.
 newtype O a = O { unO :: ReaderT Env IO a}
-  deriving ( Functor
-           , Applicative
-           , Monad
-           , MonadReader Env
-           , MonadIO
-           )
+  deriving (Functor, Applicative, Monad, MonadReader Env, MonadIO)
 
 runO :: Options -> Config -> O a -> IO (a, Config)
 runO o c ma = do
@@ -89,7 +89,22 @@ execO a b c = snd <$> runO a b c
 
 newtype OEvent = OEvent Event
 
-newtype OState = OState Env
+data OWatch
+  = Uninitialized !FSNotify.WatchManager
+  | Started !(IO ())
+
+data OState = OState
+  { _ostateEnv   :: !Env
+  , _ostateText  :: !Text
+  , _ostateWatch :: !OWatch
+  }
+
+initState :: Options -> FSNotify.WatchManager -> OState
+initState opts wm = OState
+  { _ostateEnv   = Env { _envOptions = opts, _envConfig = undefined }
+  , _ostateText  = dummyText
+  , _ostateWatch = Uninitialized wm
+  }
 
 newtype OResource = OResource Int
   deriving (Eq, Ord, Show)
@@ -98,23 +113,44 @@ type OApp = Brick.App OState OEvent OResource
 
 oapp :: OApp
 oapp = Brick.App
-  { appDraw = const [ui]
+  { appDraw = \s -> [ui s]
   , appChooseCursor = Brick.showFirstCursor
   , appHandleEvent = handleEvent
-  , appStartEvent = pure
+  , appStartEvent = ozilStartEvent
   , appAttrMap = const $ Brick.attrMap Graphics.Vty.defAttr []
   }
 
-handleEvent :: s -> Brick.BrickEvent n e -> Brick.EventM OResource (Brick.Next s)
+ozilStartEvent :: OState -> Brick.EventM OResource OState
+ozilStartEvent s = case _ostateWatch s of
+  Started _ -> pure s
+  Uninitialized wm -> do
+    -- TODO: Write path creating logic
+    -- mkdir with parents
+    -- Tell user that you made a directory :)
+    -- Pause for a bit so they can read the message :)
+    -- Go ahead.
+    sw <- liftIO (FSNotify.watchDir wm Default.configDir toReactOrNotToReact writeToChan)
+    pure (s { _ostateWatch = Started sw})
+  where
+    writeToChan :: Event -> IO ()
+    writeToChan = undefined
+
+handleEvent :: OState -> Brick.BrickEvent n e -> Brick.EventM OResource (Brick.Next OState)
 handleEvent s = \case
-  Brick.VtyEvent (V.EvKey V.KEsc []) -> Brick.halt s
-  Brick.VtyEvent (V.EvKey V.KDown []) -> do
-    Brick.vScrollBy (Brick.viewportScroll (OResource 10)) 1
+  Brick.VtyEvent (V.EvKey V.KEsc []) -> do
+    case _ostateWatch s of
+      Started stopWatch -> liftIO stopWatch
+      Uninitialized _ -> pure ()
+    Brick.halt s
+  ev -> do
+    let
+      scrollAmt = case ev of
+        Brick.VtyEvent (V.EvKey V.KDown []) ->  1
+        Brick.VtyEvent (V.EvKey V.KUp   []) -> -1
+        _ -> 0
+    when (scrollAmt /= 0)
+      $ Brick.vScrollBy (Brick.viewportScroll (OResource 10)) scrollAmt
     Brick.continue s
-  Brick.VtyEvent (V.EvKey V.KUp []) -> do
-    Brick.vScrollBy (Brick.viewportScroll (OResource 10)) (-1)
-    Brick.continue s
-  _ -> Brick.continue s
 
 -- The UI should look like
 --
@@ -131,25 +167,18 @@ handleEvent s = \case
 -- +------------------------+
 --
 -- ui :: (Show n, Ord n) => Brick.Widget n
-ui :: Brick.Widget OResource
-ui = Border.borderWithLabel (Brick.str " binaryname ") $
+ui :: OState -> Brick.Widget OResource
+ui s = Border.borderWithLabel (Brick.str " binaryname ") $
   body
   Brick.<=>
   Border.hBorder
   Brick.<=>
-  Brick.str "ESC = Exit"
-  -- Brick.<=>
-  -- Brick.padTop (Brick.Pad 1) t2
+  Brick.txt "ESC = Exit"
   where
-    -- body = Brick.strWrap dummyText
-    body = Brick.visible $ Brick.viewport (OResource 10) Brick.Vertical (Brick.strWrap dummyText)
-    -- settings = defaultWrapSettings { preserveIndentation = True }
-    -- t2 = Brick.strWrapWith settings $
-    --     "This text wraps\n" <>
-    --     "   with different settings to preserve indentation\n" <>
-    --     "   so that long lines wrap in nicer way."
+    body = Brick.visible
+        (Brick.viewport (OResource 10) Brick.Vertical (Brick.txtWrap (_ostateText s)))
 
-dummyText :: String
+dummyText :: Text
 dummyText =
   "Case read they must it of cold that. Speaking trifling an to unpacked moderate debating learning. An particular contrasted he excellence favourable on. Nay preference dispatched difficulty continuing joy one. Songs it be if ought hoped of. Too carriage attended him entrance desirous the saw. Twenty sister hearts garden limits put gay has. We hill lady will both sang room by. Desirous men exercise overcame procured speaking her followed. \
 

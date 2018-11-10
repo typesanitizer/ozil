@@ -34,8 +34,8 @@ data Zipped = Unzipped | Zipped
 
 zipped :: Iso' Bool Zipped
 zipped = iso
-  (\case {False -> Unzipped; True -> Zipped;})
-  (\case {Unzipped -> False; Zipped -> True;})
+  (\case False -> Unzipped; True -> Zipped)
+  (\case Unzipped -> False; Zipped -> True)
 
 data InputFileType
   = Binary
@@ -70,6 +70,7 @@ data WhatIsOptions = WhatIsOptions
   , _whatIsOptionsInputs :: RegexStr
   } deriving Show
 
+-- | Subcommand under use.
 data Command
   = Config !ConfigOptions
   | Default !DefaultOptions
@@ -77,6 +78,7 @@ data Command
   -- | Db !DbOptions
   deriving Show
 
+-- | Command line options
 data Options = Options
   { _optionsConfigPath :: !(Maybe FilePath)
   , _optionsOptCommand :: !Command

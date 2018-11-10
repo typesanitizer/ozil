@@ -4,7 +4,7 @@ import Help.Ozil.App.Cmd
 import Help.Ozil.App.Death
 
 import Help.Page (DocPage, ManPageInfo (..), HelpPageInfo (..))
-import Help.Ozil.App.Core (oapp, evalO, O, OApp)
+import Help.Ozil.App.Core (initState, oapp, evalO, O, OApp)
 import Help.Ozil.App.Config (saveConfig, getConfig, toReactOrNotToReact)
 
 import qualified Help.Ozil.App.Default as Default
@@ -24,17 +24,12 @@ import qualified Graphics.Vty as Vty
 import qualified System.FSNotify as FSNotify
 
 main :: IO ()
-main = defaultMain $ \opts -> FSNotify.withManager $ \_ -> do
+main = defaultMain $ \opts -> FSNotify.withManager $ \wm -> do
   chan <- BChan.newBChan maxChanSize
-  -- stopWatch <- FSNotify.watchDir wm Default.configDir toReactOrNotToReact writeToChan
-  saveState $ Brick.customMain gui (Just chan) oapp (initState opts)
-  -- stopWatch
+  saveState $ Brick.customMain gui (Just chan) oapp (initState opts wm)
   where
     gui = Vty.mkVty Vty.defaultConfig
-    initState = undefined
     maxChanSize = 10
-    -- writeToChan :: FSNotify.Event -> IO ()
-    -- writeToChan = undefined
     saveState = void
 
 runOzil :: Options -> IO (FSNotify.WatchManager -> IO ())
