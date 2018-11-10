@@ -25,12 +25,19 @@ on user contributions.
 
 ## Installing
 
-Protip: When your colleagues ask you what software you're using, you can say
-"It's my man ozil!".
-
 ### Download a binary
 
 ### Building from source
+
+Get [stack](https://docs.haskellstack.org/en/stable/README/#how-to-install)
+first. Then run
+
+```
+git clone https://github.com/theindigamer/ozil.git
+cd ozil && stack install
+```
+
+This will install `ozil` to `~/.local/bin` which is (hopefully?) on your `$PATH`.
 
 ## Relation to mandb
 
@@ -39,11 +46,9 @@ Protip: When your colleagues ask you what software you're using, you can say
 - Also, on many (most?) modern distributions, `man-db` provides
   the `man` command plus a few others (`whatis`, `apropos`, `mandb` etc).
   While `ozil` is not intended as a direct substitute for `man-db`, it does
-  provide substitutes for common use cases -
+  provide 1 substitute -
 
   * `whatis` becomes `ozil wat`.
-  * `apropos` becomes `ozil grep`.
-  * `mandb` becomes `ozil sync`.
 
 ## Contributing
 
