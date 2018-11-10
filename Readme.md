@@ -10,12 +10,11 @@ porcelain for `man`/`--help` + `less`/`more`/`most`.
   `--help` or `-h`). [TODO: Insert GIF]
 - [ ] Follow links inside man/help pages with hints.
   - TODO: insert GIF
-- [ ] Autodetection of subcommand help pages.
+- [ ] Automatic detection of subcommand help pages.
   - TODO: insert GIF
 - [ ] Simple but flexible configuration with hot-reloading by default.
   - TODO: insert GIF
-- [ ] Sensible keyboard shortcuts by default.
-- [ ] Option to highlight information for easier use later.
+- [ ] Option to highlight information for later use.
   - TODO: insert GIF
 
 ## Platforms
@@ -39,17 +38,19 @@ cd ozil && stack install
 
 This will install `ozil` to `~/.local/bin` which is (hopefully?) on your `$PATH`.
 
-## Relation to mandb
+## Usage
 
-- Currently `ozil` depends on `man` for path handling; it doesn't duplicate
-  databases or go hunting for files by itself. This may change in the future.
-- Also, on many (most?) modern distributions, `man-db` provides
-  the `man` command plus a few others (`whatis`, `apropos`, `mandb` etc).
-  While `ozil` is not intended as a direct substitute for `man-db`, it does
-  provide 1 substitute -
-
-  * `whatis` becomes `ozil wat`.
+If you want to see the help for `foo`, run `ozil foo`. That's it.
+`ozil` will guide you as needed. Of course, you can try using `ozil ozil`
+as well :smile:.
 
 ## Contributing
 
 ## Thanks
+
+## Miscellaneous
+
+### Relation to mandb
+
+- Currently `ozil` depends on `man` for path handling; it doesn't duplicate
+  databases or go hunting for files by itself. This may change in the future.

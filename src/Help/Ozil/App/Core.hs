@@ -10,6 +10,7 @@ module Help.Ozil.App.Core
   , OResource (..)
   , OState
   , HasText (..)
+  , HasHeading (..)
   , config
   , watch
   , getOptions
@@ -45,11 +46,12 @@ data OWatch
   | Running       !(IO ()) -- ^ Action to stop the watch
 
 data OState = OState
-  { oStateOptions :: !Options
-  , _oStateConfig :: !Config
-  , _oStateText   :: !Text
-  , _oStateWatch  :: !OWatch
-  , oStateChan    :: !(BChan OEvent)
+  { oStateOptions  :: !Options
+  , _oStateConfig  :: !Config
+  , _oStateText    :: !Text
+  , _oStateWatch   :: !OWatch
+  , oStateChan     :: !(BChan OEvent)
+  , _oStateHeading :: !Text
   }
 makeFields ''OState
 
@@ -61,9 +63,10 @@ getBChan = oStateChan
 
 newOState :: Options -> WatchManager -> BChan OEvent -> OState
 newOState opts wm ch = OState
-  { oStateOptions = opts
-  , _oStateConfig = Default.config
-  , _oStateText   = "Placeholder text"
-  , _oStateWatch  = Uninitialized wm
-  , oStateChan    = ch
+  { oStateOptions  = opts
+  , _oStateConfig  = Default.config
+  , _oStateText    = "Placeholder text"
+  , _oStateWatch   = Uninitialized wm
+  , oStateChan     = ch
+  , _oStateHeading = "binaryname"
   }

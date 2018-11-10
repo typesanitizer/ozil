@@ -115,7 +115,7 @@ autoSelection ms hs = liftIO $ (, DontSaveSelection) <$>
       -- the input from the monad.
 
 retrieveManPage :: ManPageInfo -> IO DocPage
-retrieveManPage = undefined
+retrieveManPage (ManPageInfo path) = undefined
 
 retrieveHelpPage :: HelpPageInfo -> IO DocPage
 retrieveHelpPage (HelpPageInfo binpath) = do

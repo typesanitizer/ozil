@@ -27,7 +27,9 @@ prompt :: DefaultBool -> Text -> IO Bool
 prompt def msg = do
   T.putStr fullMsg
   hFlush stdout
+  print "Waiting for input..."
   inp <- T.getLine
+  T.putStrLn (T.append "got " inp)
   case T.toLower (T.strip inp) of
     ""  -> pure (coerce def)
     "y" -> pure True

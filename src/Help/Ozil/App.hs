@@ -16,6 +16,7 @@ import Brick (App (..))
 import qualified Brick
 import qualified Brick.BChan as BChan
 import qualified Brick.Widgets.Border as Border
+import qualified Data.Text as T
 import qualified Graphics.Vty as Vty
 import qualified System.FSNotify as FSNotify
 
@@ -61,6 +62,7 @@ ozilStartEvent s = case s ^. watch of
     -- Pause for a bit so they can read the message :)
     -- Go ahead.
     (dp, config', sw) <- liftIO $ do
+      -- TODO: Actually remember the selection if we're supposed to do so.
       ((dp, _), config') <- finishStartup (getOptions s)
       sw <- FSNotify.watchDir wm Default.configDir toReactOrNotToReact forwardEvent
       pure (dp, config', sw)
@@ -99,27 +101,28 @@ handleEvent s = \case
 
 -- The UI should look like
 --
--- +------ binaryname ------+
--- |                        |
--- | blah                   |
--- |                        |
--- | blah                   |
--- |                        |
--- | blah                   |
--- |                        |
--- +------------------------+
--- | Esc/q = Exit           |
--- +------------------------+
+-- +------  heading  ------+
+-- |                       |
+-- | blah                  |
+-- |                       |
+-- | blah                  |
+-- |                       |
+-- | blah                  |
+-- |                       |
+-- +-----------------------+
+-- | Esc/q = Exit ...      |
+-- +-----------------------+
 --
 -- ui :: (Show n, Ord n) => Brick.Widget n
-ui :: HasText s Text => s -> Brick.Widget OResource
-ui s = Border.borderWithLabel (Brick.txt " binaryname ") $
+ui :: (HasText s Text, HasHeading s Text) => s -> Brick.Widget OResource
+ui s = Border.borderWithLabel (Brick.txt header) $
   body
   Brick.<=>
   Border.hBorder
   Brick.<=>
   Brick.txt "Esc/q = Exit  k/↑ = Up  j/↓ = Down"
   where
+    header = T.snoc (T.cons ' ' (s ^. heading)) ' '
     body = s ^. text
       & Brick.txtWrap
       & Brick.viewport TextViewport Brick.Vertical
