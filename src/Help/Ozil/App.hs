@@ -77,20 +77,25 @@ handleEvent
   -> Brick.BrickEvent n OEvent
   -> Brick.EventM OResource (Brick.Next OState)
 handleEvent s = \case
-  Brick.VtyEvent (Vty.EvKey Vty.KEsc []) -> do
-    case s ^. watch of
-      Running stopWatch -> liftIO stopWatch
-      Uninitialized _ -> pure ()
-    Brick.halt s
+  Brick.VtyEvent (Vty.EvKey Vty.KEsc        []) -> stopProgram
+  Brick.VtyEvent (Vty.EvKey (Vty.KChar 'q') []) -> stopProgram
   ev -> do
     let
       scrollAmt = case ev of
-        Brick.VtyEvent (Vty.EvKey Vty.KDown []) ->  1
-        Brick.VtyEvent (Vty.EvKey Vty.KUp   []) -> -1
+        Brick.VtyEvent (Vty.EvKey Vty.KDown       []) ->  1
+        Brick.VtyEvent (Vty.EvKey (Vty.KChar 'j') []) ->  1
+        Brick.VtyEvent (Vty.EvKey (Vty.KChar 'k') []) -> -1
+        Brick.VtyEvent (Vty.EvKey Vty.KUp         []) -> -1
         _ -> 0
     when (scrollAmt /= 0)
       $ Brick.vScrollBy (Brick.viewportScroll TextViewport) scrollAmt
     Brick.continue s
+  where
+    stopProgram = do
+      case s ^. watch of
+        Running stopWatch -> liftIO stopWatch
+        Uninitialized _ -> pure ()
+      Brick.halt s
 
 -- The UI should look like
 --
@@ -103,17 +108,17 @@ handleEvent s = \case
 -- | blah                   |
 -- |                        |
 -- +------------------------+
--- | ESC = Exit             |
+-- | Esc/q = Exit           |
 -- +------------------------+
 --
 -- ui :: (Show n, Ord n) => Brick.Widget n
 ui :: HasText s Text => s -> Brick.Widget OResource
-ui s = Border.borderWithLabel (Brick.str " binaryname ") $
+ui s = Border.borderWithLabel (Brick.txt " binaryname ") $
   body
   Brick.<=>
   Border.hBorder
   Brick.<=>
-  Brick.txt "ESC = Exit"
+  Brick.txt "Esc/q = Exit  k/↑ = Up  j/↓ = Down"
   where
     body = s ^. text
       & Brick.txtWrap
