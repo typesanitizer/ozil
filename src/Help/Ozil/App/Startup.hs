@@ -12,16 +12,22 @@ import Help.Ozil.App.Cmd
 import Help.Ozil.App.Death
 import Help.Ozil.App.Startup.Core
 
+import Help.Page.Man (parseWhatisDescription, WhatisDescription (..))
 import Help.Ozil.App.Config (getConfig, Config)
 
 import qualified Help.Ozil.App.Default as Default
 
+import Codec.Compression.GZip (decompress)
+import Data.List.Extra (trim)
 import System.Exit (ExitCode (..))
-import System.FilePath (dropExtension)
-import System.Process (readProcessWithExitCode)
+import System.FilePath (takeExtension, dropExtension)
+import System.Process (readProcess, readProcessWithExitCode)
 
 import qualified Control.Lens as L
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
+import qualified Data.Text.Encoding as T
+import qualified Data.ByteString.Lazy as BS
 
 --------------------------------------------------------------------------------
 -- * Exports
@@ -115,7 +121,16 @@ autoSelection ms hs = liftIO $ (, DontSaveSelection) <$>
       -- the input from the monad.
 
 retrieveManPage :: ManPageInfo -> IO DocPage
-retrieveManPage (ManPageInfo path) = undefined
+retrieveManPage (ManPageInfo descr) = do
+  -- TODO: Error handling...
+  let WhatisDescription n s _ = fromJust (parseWhatisDescription $ T.pack descr)
+  path <- trim <$> readProcess "man" ["-S", T.unpack s, "-w", T.unpack n] ""
+  -- TODO: Man pages might be in some other encoding like Latin1?
+  -- TODO: Man pages might be stored in other formats?
+  txt <- if takeExtension path == ".gz"
+    then T.decodeUtf8 . BS.toStrict . decompress <$> BS.readFile path
+    else T.readFile path
+  pure (Man (parseMan txt))
 
 retrieveHelpPage :: HelpPageInfo -> IO DocPage
 retrieveHelpPage (HelpPageInfo binpath) = do

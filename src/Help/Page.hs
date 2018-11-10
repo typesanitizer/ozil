@@ -5,6 +5,9 @@ import Help.Page.Help
 
 import Data.Text (Text)
 
+--------------------------------------------------------------------------------
+-- * Pages
+
 data DocPage
   = Man { _manPage :: ManPage }
   | LongHelp { _longHelpPage :: HelpPage }
@@ -26,8 +29,11 @@ parseLongHelp txt = HelpPage
 parseShortHelp :: Text -> HelpPage
 parseShortHelp = parseLongHelp
 
+parseMan :: Text -> ManPage
+parseMan txt = emptyManPage & set rest txt
+
 -- TODO: Improve this...
 render :: DocPage -> Text
-render (Man _) = "Dummy man page text"
+render (Man m) = _manPageRest m
 render (LongHelp (HelpPage _ _ x)) = x
 render (ShortHelp (HelpPage _ _ x)) = x
