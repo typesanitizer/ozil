@@ -47,20 +47,21 @@ emptyManPage = ManPage emptyHeading
     mempty mempty mempty mempty mempty mempty
     mempty mempty mempty mempty mempty
 
+-- Okay to use strings because these are going to be quite short.
 data WhatisDescription = WhatisDescription
-  { _whatisDescriptionName             :: !Text
-  , _whatisDescriptionSection          :: !Text
-  , _whatisDescriptionShortDescription :: !Text
+  { _whatisDescriptionName             :: String
+  , _whatisDescriptionSection          :: String
+  , _whatisDescriptionShortDescription :: String
   }
 
-parseWhatisDescription :: Text -> Maybe WhatisDescription
+parseWhatisDescription :: String -> Maybe WhatisDescription
 parseWhatisDescription = parseMaybe p
   where
-    p :: Parsec Void Text WhatisDescription
+    p :: Parsec Void String WhatisDescription
     p = do
-      name <- pack <$> some (alphaNumChar <|> char '-')
+      name <- some (alphaNumChar <|> char '-')
       space1
-      sec <- pack <$> between (char '(') (char ')') (some (alphaNumChar <|> char '-'))
+      sec <- between (char '(') (char ')') (some (alphaNumChar <|> char '-'))
       space1 *> char '-' *> space1
-      descr <- pack <$> some anyChar
+      descr <- some anyChar
       pure (WhatisDescription name sec descr)

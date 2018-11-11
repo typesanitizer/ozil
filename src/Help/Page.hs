@@ -13,7 +13,13 @@ data DocPage
   | LongHelp { _longHelpPage :: HelpPage }
   | ShortHelp { _shortHelpPage :: HelpPage }
 
-newtype ManPageSummary = ManPageSummary { shortDescription :: String }
+data ManPageSummary
+  = WhatisDescr !WhatisDescription
+  | UnknownFormat { _shortDescription :: String }
+
+parseManPageSummary :: String -> ManPageSummary
+parseManPageSummary s =
+  maybe (UnknownFormat s) WhatisDescr (parseWhatisDescription s)
 
 data HelpPageSummary = HelpPageSummary
   { binaryPath         :: FilePath

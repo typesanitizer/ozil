@@ -11,6 +11,7 @@ module Commons
   , module Data.Text
   , module Data.Void
   , module GHC.Stack
+  , module Text.Printf
   , readProcessSimple
   , headMaybe
   , pattern KeyPress
@@ -29,6 +30,7 @@ import Data.Maybe
 import Data.Text (Text, pack, unpack)
 import Data.Void
 import GHC.Stack (HasCallStack)
+import Text.Printf (printf)
 
 import System.Process (readProcessWithExitCode)
 import System.Exit (ExitCode (..))

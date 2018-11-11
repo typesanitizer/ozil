@@ -1,3 +1,5 @@
+{-# LANGUAGE ViewPatterns #-}
+
 module Help.Ozil.App.Startup
   ( finishStartup
   ) where
@@ -5,11 +7,11 @@ module Help.Ozil.App.Startup
 import Commons
 
 import Help.Page
+import Help.Page.Lenses (name, section, shortDescription)
 import Help.Ozil.App.Cmd
 import Help.Ozil.App.Death
 import Help.Ozil.App.Startup.Core
 
-import Help.Page.Man (parseWhatisDescription, WhatisDescription (..))
 import Help.Ozil.App.Config (getConfig, Config)
 
 import qualified Help.Ozil.App.Default as Default
@@ -18,7 +20,7 @@ import Brick (App (..))
 import Codec.Compression.GZip (decompress)
 import Data.List.Extra (trim)
 import System.Exit (ExitCode (..))
-import System.FilePath (takeExtension, dropExtension)
+import System.FilePath ((</>), splitDirectories, splitDrive, splitFileName, takeExtension, dropExtension)
 import System.Process (readProcess, readProcessWithExitCode)
 
 import qualified Brick
@@ -86,14 +88,14 @@ getManPageSummaries = do
       (ecode, out, _) <- readProcessWithExitCode "whatis" ["-w", go p] ""
       pure $ case ecode of
         ExitFailure _ -> []
-        ExitSuccess   -> map ManPageSummary (lines out)
+        ExitSuccess   -> map parseManPageSummary (lines out)
         -- ^ No need to parse it right away.
   where
     go InputPath{} = unimplementedError
-    go (InputFile ty name) = case ty of
-      Binary           -> name
-      ManPage Unzipped -> dropExtension name
-      ManPage Zipped   -> dropExtension (dropExtension name)
+    go (InputFile ty nm) = case ty of
+      Binary           -> nm
+      ManPage Unzipped -> dropExtension nm
+      ManPage Zipped   -> dropExtension (dropExtension nm)
 
 -- TODO: Extend this to allow for multiple help pages.
 -- For example, if you're working on something which you also install
@@ -106,12 +108,12 @@ getHelpPageSummaries = do
   check (cmd ^? _Default.inputs) $ \case
     InputPath{} -> unimplementedErrorM
     InputFile ManPage{} _ -> pure []
-    InputFile Binary name -> liftIO $ do
+    InputFile Binary nm -> liftIO $ do
       -- FIXME: Calling 'which' is not portable.
       -- https://unix.stackexchange.com/q/85249/89474
       -- However, 'command' might be a shell built-in, and I'm not sure how to
       -- use the API in System.Process to call shell commands and capture stdout
-      binpaths <- readProcessSimple "which" [name]
+      binpaths <- readProcessSimple "which" [nm]
       check binpaths $ \txt ->
         fmap catMaybes . forM (T.lines txt) $ \path -> do
           let path' = unpack path
@@ -133,16 +135,18 @@ getDocPage = \case
   HelpSummary h -> getHelpPage h
 
 getManPage :: HasCallStack => ManPageSummary -> IO DocPage
-getManPage (ManPageSummary descr) = do
-  -- TODO: Error handling...
-  let WhatisDescription n s _ = fromJust' (parseWhatisDescription $ T.pack descr)
-  path <- trim <$> readProcess "man" ["-S", T.unpack s, "-w", T.unpack n] ""
+getManPage (WhatisDescr w) = do
+  let (n, s) = (w ^. name, w ^. section)
+  path <- trim <$> readProcess "man" ["-S", s, "-w", n] ""
   -- TODO: Man pages might be in some other encoding like Latin1?
   -- TODO: Man pages might be stored in other formats?
   txt <- if takeExtension path == ".gz"
     then T.decodeUtf8 . BS.toStrict . decompress <$> BS.readFile path
     else T.readFile path
   pure (Man (parseMan txt))
+getManPage (UnknownFormat _) =
+  -- TODO: Error handling
+  error "Error: Unexpected format for man page summary."
 
 getShortHelp :: FilePath -> IO (Maybe Text)
 getShortHelp p = readProcessSimple p ["-h"]
@@ -160,7 +164,6 @@ getHelpPage (HelpPageSummary binpath short _) =
 --------------------------------------------------------------------------------
 -- * Selection process
 
--- Precondition: The input list has 2+ elements.
 runSelectionApp
   :: HasCallStack
   => NonEmpty DocPageSummary
@@ -191,16 +194,37 @@ runSelectionApp dps = do
       , appAttrMap = const highlightSelection
       }
 
-selectionAppDraw :: NonEmpty a -> Int -> [Brick.Widget n]
+summaryButtonStr :: DocPageSummary -> String
+summaryButtonStr = \case
+  HelpSummary (HelpPageSummary p sh _) ->
+    abbrev p ++ if sh then " -h" else " --help"
+    where abbrev (splitFileName -> (ds, fn)) =
+            let (dr, splitDirectories -> dirs) = splitDrive ds
+                middir = maybe ".." (</> "..") (headMaybe dirs)
+            in dr </> middir </> fn
+  ManSummary (UnknownFormat s) -> s
+  ManSummary (WhatisDescr w) ->
+    let s1 = printf "%s(%s)" (w ^. name) (w ^. section) :: String
+        -- (s2pre, splitAt 3 -> (post', post'')) =
+        --   splitAt (selectionAppDialogWidth - length s1 - 8) (w ^. shortDescription)
+        -- s2 = s2pre ++ (if null post'' then post' else "...")
+    in s1
+    -- in printf "%s - %s" s1 s2
+
+selectionAppDialogWidth :: Int
+selectionAppDialogWidth = 80
+
+selectionAppDraw :: NonEmpty DocPageSummary -> Int -> [Brick.Widget n]
 selectionAppDraw ds i =
   [ W.renderDialog
     ( W.dialog
       (Just " Which choice should be made? ")
       (Just (i, buttons))
-      80
+      selectionAppDialogWidth
     ) W.emptyWidget
   ]
-  where buttons = zipWith (\z d -> (show z, d)) [0 ..] (NE.toList ds)
+  where
+    buttons = map (\d -> (summaryButtonStr d, d)) (NE.toList ds)
 
 selectionAppHandleEvent
   :: Int -- ^ Length of the list
@@ -222,6 +246,8 @@ saveSelectionAppDraw _ ss =
       60
     ) W.emptyWidget
   ]
+  -- TODO: Add an option for "No. Don't prompt me again for this in the future."
+  -- Maybe that should only be an option in the config file and not in the TUI?
   where buttons = [("Yes", SaveSelection), ("No", DontSaveSelection)]
 
 saveSelectionAppHandleEvent

@@ -13,3 +13,4 @@ makeFields ''HelpPage
 makeFields ''Heading
 makeFields ''ManPage
 makeFields ''DocPage
+makeFields ''WhatisDescription
