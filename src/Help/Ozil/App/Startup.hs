@@ -169,16 +169,17 @@ runSelectionApp
   :: HasCallStack
   => NonEmpty DocPageSummary
   -> IO (DocPageSummary, SaveSelection)
-runSelectionApp dps@(_ :| dps_tl) = do
-  (_, dp :| tl) <- Brick.defaultMain (selectionApp (1 + length dps_tl)) (0, dps)
-  assert (null tl) (pure ())
+runSelectionApp dps = do
+  let len = NE.length dps
+  i <- Brick.defaultMain (selectionApp len dps) 0
+  let dp = assert (0 <= i && i < len) (dps NE.!! i)
   ss <- Brick.defaultMain (saveSelectionApp dp) DontSaveSelection
   pure (dp, ss)
   where
     emptyAttrMap = const $ Brick.attrMap Vty.defAttr []
-    selectionApp :: Int -> App (Int, NonEmpty DocPageSummary) () Int
-    selectionApp len = App
-      { appDraw = selectionAppDraw
+    selectionApp :: Int -> NonEmpty DocPageSummary -> App Int () Int
+    selectionApp len ds = App
+      { appDraw = selectionAppDraw ds
       , appChooseCursor = Brick.showFirstCursor
       , appHandleEvent = selectionAppHandleEvent len
       , appStartEvent = pure
@@ -197,15 +198,15 @@ selectionAppDraw :: a
 selectionAppDraw = undefined
 
 selectionAppHandleEvent
-  :: Int
-  -> (Int, NonEmpty a)
-  -> Brick.BrickEvent n1 e
-  -> Brick.EventM n2 (Brick.Next (Int, NonEmpty a))
-selectionAppHandleEvent len (i, ds) = \case
-  KeyPress Vty.KDown  | i + 1 < len -> Brick.continue (i + 1, ds)
-  KeyPress Vty.KUp    | i > 0       -> Brick.continue (i - 1, ds)
-  KeyPress Vty.KEnter -> Brick.halt (i, (ds NE.!! i) :| [])
-  _                   -> Brick.continue (i, ds)
+  :: Int -- ^ Length of the list
+  -> Int -- ^ State (index into the list)
+  -> Brick.BrickEvent n e
+  -> Brick.EventM n' (Brick.Next Int)
+selectionAppHandleEvent len i = \case
+  KeyPress Vty.KDown  | i + 1 < len -> Brick.continue (i + 1)
+  KeyPress Vty.KUp    | i > 0       -> Brick.continue (i - 1)
+  KeyPress Vty.KEnter -> Brick.halt i
+  _                   -> Brick.continue i
 
 saveSelectionAppDraw :: a
 saveSelectionAppDraw = undefined
