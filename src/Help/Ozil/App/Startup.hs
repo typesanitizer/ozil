@@ -7,11 +7,11 @@ module Help.Ozil.App.Startup
 import Commons
 
 import Help.Page
-import Help.Page.Lenses (name, section, shortDescription)
 import Help.Ozil.App.Cmd
 import Help.Ozil.App.Death
 import Help.Ozil.App.Startup.Core
 
+import Help.Page.Lenses (name, section, shortDescription)
 import Help.Ozil.App.Config (getConfig, Config)
 
 import qualified Help.Ozil.App.Default as Default
@@ -20,12 +20,15 @@ import Brick (App (..))
 import Codec.Compression.GZip (decompress)
 import Data.List.Extra (trim)
 import System.Exit (ExitCode (..))
-import System.FilePath ((</>), splitDirectories, splitDrive, splitFileName, takeExtension, dropExtension)
+import System.FilePath
+  ( (</>), splitDirectories, splitDrive, splitFileName, takeExtension
+  , dropExtension)
 import System.Process (readProcess, readProcessWithExitCode)
 
 import qualified Brick
 import qualified Brick.Widgets.Core as W
 import qualified Brick.Widgets.Dialog as W
+import qualified Brick.Widgets.GDialog as W
 import qualified Control.Lens as L
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
@@ -172,7 +175,7 @@ runSelectionApp dps = do
   let len = NE.length dps
   i <- Brick.defaultMain (selectionApp len dps) 0
   let dp = assert (0 <= i && i < len) (dps NE.!! i)
-  ss <- Brick.defaultMain (saveSelectionApp dp) DontSaveSelection
+  ss <- Brick.defaultMain (saveSelectionApp dp) DontSave
   pure (dp, ss)
   where
     highlightSelection = Brick.attrMap Vty.defAttr
@@ -205,20 +208,19 @@ summaryButtonStr = \case
   ManSummary (UnknownFormat s) -> s
   ManSummary (WhatisDescr w) ->
     let s1 = printf "%s(%s)" (w ^. name) (w ^. section) :: String
-        -- (s2pre, splitAt 3 -> (post', post'')) =
-        --   splitAt (selectionAppDialogWidth - length s1 - 8) (w ^. shortDescription)
-        -- s2 = s2pre ++ (if null post'' then post' else "...")
-    in s1
-    -- in printf "%s - %s" s1 s2
+        (s2pre, splitAt 3 -> (post', post'')) =
+          splitAt (selectionAppDialogWidth - length s1 - 8) (w ^. shortDescription)
+        s2 = s2pre ++ (if null post'' then post' else "...")
+    in printf "%s - %s" s1 s2
 
 selectionAppDialogWidth :: Int
-selectionAppDialogWidth = 80
+selectionAppDialogWidth = 60
 
 selectionAppDraw :: NonEmpty DocPageSummary -> Int -> [Brick.Widget n]
 selectionAppDraw ds i =
-  [ W.renderDialog
-    ( W.dialog
-      (Just " Which choice should be made? ")
+  [ W.renderGDialog
+    ( W.VDialog $ W.dialog
+      (Just " So many options! Pick one. ")
       (Just (i, buttons))
       selectionAppDialogWidth
     ) W.emptyWidget
@@ -232,40 +234,53 @@ selectionAppHandleEvent
   -> Brick.BrickEvent n e
   -> Brick.EventM n' (Brick.Next Int)
 selectionAppHandleEvent len i = \case
-  KeyPress Vty.KLeft  | i > 0       -> Brick.continue (i - 1)
-  KeyPress Vty.KRight | i + 1 < len -> Brick.continue (i + 1)
-  KeyPress Vty.KEnter -> Brick.halt i
-  _                   -> Brick.continue i
+  Brick.VtyEvent ev ->
+    case W.simpleHandleEvent p W.V ev of
+      W.Next i' -> Brick.continue i'
+      W.Done    -> Brick.halt i
+      W.Unknown -> Brick.continue i
+  _ -> Brick.continue i
+  where p = W.Pos{W.idx=i, W.len}
 
 saveSelectionAppDraw :: p -> SaveSelection -> [Brick.Widget n]
 saveSelectionAppDraw _ ss =
-  [ W.renderDialog
-    ( W.dialog
+  [ W.renderGDialog
+    ( W.HDialog $ W.dialog
       (Just " Would you like to save this choice for the future? ")
-      (Just (if ss == SaveSelection then 0 else 1, buttons))
+      (Just (fromEnum ss, buttons))
       60
     ) W.emptyWidget
   ]
   -- TODO: Add an option for "No. Don't prompt me again for this in the future."
   -- Maybe that should only be an option in the config file and not in the TUI?
-  where buttons = [("Yes", SaveSelection), ("No", DontSaveSelection)]
+  where buttons = [("Yes", Save), ("No", DontSave)]
 
 saveSelectionAppHandleEvent
   :: SaveSelection
   -> Brick.BrickEvent n1 e
   -> Brick.EventM n2 (Brick.Next SaveSelection)
 saveSelectionAppHandleEvent s = \case
-  -- Left = Yes, Right = No, Default = No
-  KeyPress Vty.KLeft
-    | s == DontSaveSelection -> Brick.continue SaveSelection
-  KeyPress Vty.KRight
-    | s == SaveSelection     -> Brick.continue DontSaveSelection
-  KeyPress Vty.KEnter        -> Brick.halt s
+  Brick.VtyEvent ev ->
+    case W.simpleHandleEvent p W.H ev of
+      W.Next i' -> Brick.continue (toEnum i')
+      W.Done    -> Brick.halt s
+      W.Unknown -> Brick.continue s
   _ -> Brick.continue s
+  where p = W.Pos{W.idx=fromEnum s, W.len=2}
 
-newtype SaveSelection = MkSaveSelection Bool
+newtype SaveSelection = SaveSelection Bool
   deriving Eq
 
-pattern SaveSelection, DontSaveSelection :: SaveSelection
-pattern SaveSelection = MkSaveSelection True
-pattern DontSaveSelection = MkSaveSelection False
+instance Enum SaveSelection where
+  toEnum = \case
+    0 -> Save
+    1 -> DontSave
+    _ -> unreachableError
+
+  fromEnum (SaveSelection b) = if b then 0 else 1
+
+{-# COMPLETE Save, DontSave #-}
+
+pattern Save, DontSave :: SaveSelection
+pattern Save = SaveSelection True
+pattern DontSave = SaveSelection False
