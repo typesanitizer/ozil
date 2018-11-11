@@ -73,15 +73,15 @@ handleEvent
   -> Brick.BrickEvent n OEvent
   -> Brick.EventM OResource (Brick.Next OState)
 handleEvent s = \case
-  Brick.VtyEvent (Vty.EvKey Vty.KEsc        []) -> stopProgram
-  Brick.VtyEvent (Vty.EvKey (Vty.KChar 'q') []) -> stopProgram
+  KeyPress Vty.KEsc        -> stopProgram
+  KeyPress (Vty.KChar 'q') -> stopProgram
   ev -> do
     let
       scrollAmt = case ev of
-        Brick.VtyEvent (Vty.EvKey Vty.KDown       []) ->  1
-        Brick.VtyEvent (Vty.EvKey (Vty.KChar 'j') []) ->  1
-        Brick.VtyEvent (Vty.EvKey (Vty.KChar 'k') []) -> -1
-        Brick.VtyEvent (Vty.EvKey Vty.KUp         []) -> -1
+        KeyPress Vty.KDown       ->  1
+        KeyPress (Vty.KChar 'j') ->  1
+        KeyPress (Vty.KChar 'k') -> -1
+        KeyPress Vty.KUp         -> -1
         _ -> 0
     when (scrollAmt /= 0)
       $ Brick.vScrollBy (Brick.viewportScroll TextViewport) scrollAmt

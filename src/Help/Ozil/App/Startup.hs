@@ -28,6 +28,7 @@ import System.Process (readProcess, readProcessWithExitCode)
 
 import qualified Brick
 import qualified Control.Lens as L
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
@@ -168,18 +169,18 @@ runSelectionApp
   :: HasCallStack
   => NonEmpty DocPageSummary
   -> IO (DocPageSummary, SaveSelection)
-runSelectionApp dps = do
-  dp :| tl <- Brick.defaultMain selectionApp dps
+runSelectionApp dps@(_ :| dps_tl) = do
+  (_, dp :| tl) <- Brick.defaultMain (selectionApp (1 + length dps_tl)) (0, dps)
   assert (null tl) (pure ())
   ss <- Brick.defaultMain (saveSelectionApp dp) DontSaveSelection
   pure (dp, ss)
   where
     emptyAttrMap = const $ Brick.attrMap Vty.defAttr []
-    selectionApp :: App (NonEmpty DocPageSummary) () Int
-    selectionApp = App
+    selectionApp :: Int -> App (Int, NonEmpty DocPageSummary) () Int
+    selectionApp len = App
       { appDraw = selectionAppDraw
       , appChooseCursor = Brick.showFirstCursor
-      , appHandleEvent = selectionAppHandleEvent
+      , appHandleEvent = selectionAppHandleEvent len
       , appStartEvent = pure
       , appAttrMap = emptyAttrMap
       }
@@ -192,15 +193,38 @@ runSelectionApp dps = do
       , appAttrMap = emptyAttrMap
       }
 
-selectionAppHandleEvent = undefined
-
+selectionAppDraw :: a
 selectionAppDraw = undefined
 
+selectionAppHandleEvent
+  :: Int
+  -> (Int, NonEmpty a)
+  -> Brick.BrickEvent n1 e
+  -> Brick.EventM n2 (Brick.Next (Int, NonEmpty a))
+selectionAppHandleEvent len (i, ds) = \case
+  KeyPress Vty.KDown  | i + 1 < len -> Brick.continue (i + 1, ds)
+  KeyPress Vty.KUp    | i > 0       -> Brick.continue (i - 1, ds)
+  KeyPress Vty.KEnter -> Brick.halt (i, (ds NE.!! i) :| [])
+  _                   -> Brick.continue (i, ds)
+
+saveSelectionAppDraw :: a
 saveSelectionAppDraw = undefined
 
-saveSelectionAppHandleEvent = undefined
+saveSelectionAppHandleEvent
+  :: SaveSelection
+  -> Brick.BrickEvent n1 e
+  -> Brick.EventM n2 (Brick.Next SaveSelection)
+saveSelectionAppHandleEvent s = \case
+  -- Left = Yes, Right = No, Default = No
+  KeyPress Vty.KLeft
+    | s == DontSaveSelection -> Brick.continue SaveSelection
+  KeyPress Vty.KRight
+    | s == SaveSelection     -> Brick.continue DontSaveSelection
+  KeyPress Vty.KEnter        -> Brick.halt s
+  _ -> Brick.continue s
 
 newtype SaveSelection = MkSaveSelection Bool
+  deriving Eq
 
 pattern SaveSelection, DontSaveSelection :: SaveSelection
 pattern SaveSelection = MkSaveSelection True

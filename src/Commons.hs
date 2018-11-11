@@ -14,6 +14,7 @@ module Commons
   , module GHC.Stack
   , readProcessSimple
   , headMaybe
+  , pattern KeyPress
   )
   where
 
@@ -33,6 +34,9 @@ import GHC.Stack (HasCallStack)
 import System.Process (readProcessWithExitCode)
 import System.Exit (ExitCode (..))
 
+import qualified Brick
+import qualified Graphics.Vty as Vty
+
 readProcessSimple :: FilePath -> [String] -> IO (Maybe Text)
 readProcessSimple p s = do
   (ec, out, _) <- readProcessWithExitCode p s ""
@@ -42,3 +46,6 @@ readProcessSimple p s = do
 
 headMaybe :: [a] -> Maybe a
 headMaybe = listToMaybe
+
+pattern KeyPress :: Vty.Key -> Brick.BrickEvent n e
+pattern KeyPress k = Brick.VtyEvent (Vty.EvKey k [])
