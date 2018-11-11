@@ -177,41 +177,22 @@ runSelectionApp dps = do
   let dp = assert (0 <= i && i < len) (dps NE.!! i)
   ss <- Brick.defaultMain (saveSelectionApp dp) DontSave
   pure (dp, ss)
-  where
-    highlightSelection = Brick.attrMap Vty.defAttr
-      [(W.buttonSelectedAttr, Vty.withStyle Vty.defAttr Vty.standout)]
-    selectionApp :: Int -> NonEmpty DocPageSummary -> App Int () Int
-    selectionApp len ds = App
-      { appDraw = selectionAppDraw ds
-      , appChooseCursor = Brick.showFirstCursor
-      , appHandleEvent = selectionAppHandleEvent len
-      , appStartEvent = pure
-      , appAttrMap = const highlightSelection
-      }
-    saveSelectionApp :: DocPageSummary -> App SaveSelection () Int
-    saveSelectionApp dp = App
-      { appDraw = saveSelectionAppDraw dp
-      , appChooseCursor = Brick.showFirstCursor
-      , appHandleEvent = saveSelectionAppHandleEvent
-      , appStartEvent = pure
-      , appAttrMap = const highlightSelection
-      }
 
-summaryButtonStr :: DocPageSummary -> String
-summaryButtonStr = \case
-  HelpSummary (HelpPageSummary p sh _) ->
-    abbrev p ++ if sh then " -h" else " --help"
-    where abbrev (splitFileName -> (ds, fn)) =
-            let (dr, splitDirectories -> dirs) = splitDrive ds
-                middir = maybe ".." (</> "..") (headMaybe dirs)
-            in dr </> middir </> fn
-  ManSummary (UnknownFormat s) -> s
-  ManSummary (WhatisDescr w) ->
-    let s1 = printf "%s(%s)" (w ^. name) (w ^. section) :: String
-        (s2pre, splitAt 3 -> (post', post'')) =
-          splitAt (selectionAppDialogWidth - length s1 - 8) (w ^. shortDescription)
-        s2 = s2pre ++ (if null post'' then post' else "...")
-    in printf "%s - %s" s1 s2
+highlightSelection :: Brick.AttrMap
+highlightSelection = Brick.attrMap Vty.defAttr
+  [(W.buttonSelectedAttr, Vty.withStyle Vty.defAttr Vty.standout)]
+
+------------------------------------------------------------
+-- ** Main selection app
+
+selectionApp :: Int -> NonEmpty DocPageSummary -> App Int () Int
+selectionApp len ds = App
+  { appDraw = selectionAppDraw ds
+  , appChooseCursor = Brick.showFirstCursor
+  , appHandleEvent = selectionAppHandleEvent len
+  , appStartEvent = pure
+  , appAttrMap = const highlightSelection
+  }
 
 selectionAppDialogWidth :: Int
 selectionAppDialogWidth = 60
@@ -225,8 +206,7 @@ selectionAppDraw ds i =
       selectionAppDialogWidth
     ) W.emptyWidget
   ]
-  where
-    buttons = map (\d -> (summaryButtonStr d, d)) (NE.toList ds)
+  where buttons = map (\d -> (summaryButtonStr d, d)) (NE.toList ds)
 
 selectionAppHandleEvent
   :: Int -- ^ Length of the list
@@ -241,6 +221,18 @@ selectionAppHandleEvent len i = \case
       W.Unknown -> Brick.continue i
   _ -> Brick.continue i
   where p = W.Pos{W.idx=i, W.len}
+
+------------------------------------------------------------
+-- ** Save dialog box
+
+saveSelectionApp :: DocPageSummary -> App SaveSelection () Int
+saveSelectionApp dp = App
+  { appDraw = saveSelectionAppDraw dp
+  , appChooseCursor = Brick.showFirstCursor
+  , appHandleEvent = saveSelectionAppHandleEvent
+  , appStartEvent = pure
+  , appAttrMap = const highlightSelection
+  }
 
 saveSelectionAppDraw :: p -> SaveSelection -> [Brick.Widget n]
 saveSelectionAppDraw _ ss =
@@ -267,6 +259,22 @@ saveSelectionAppHandleEvent s = \case
       W.Unknown -> Brick.continue s
   _ -> Brick.continue s
   where p = W.Pos{W.idx=fromEnum s, W.len=2}
+
+summaryButtonStr :: DocPageSummary -> String
+summaryButtonStr = \case
+  HelpSummary (HelpPageSummary p sh _) ->
+    abbrev p ++ if sh then " -h" else " --help"
+    where abbrev (splitFileName -> (ds, fn)) =
+            let (dr, splitDirectories -> dirs) = splitDrive ds
+                middir = maybe ".." (</> "..") (headMaybe dirs)
+            in dr </> middir </> fn
+  ManSummary (UnknownFormat s) -> s
+  ManSummary (WhatisDescr w) ->
+    let s1 = printf "%s(%s)" (w ^. name) (w ^. section) :: String
+        (s2pre, splitAt 3 -> (post', post'')) =
+          splitAt (selectionAppDialogWidth - length s1 - 8) (w ^. shortDescription)
+        s2 = s2pre ++ (if null post'' then post' else "...")
+    in printf "%s - %s" s1 s2
 
 newtype SaveSelection = SaveSelection Bool
   deriving Eq
