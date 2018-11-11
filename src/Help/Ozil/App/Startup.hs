@@ -27,6 +27,8 @@ import System.FilePath (takeExtension, dropExtension)
 import System.Process (readProcess, readProcessWithExitCode)
 
 import qualified Brick
+import qualified Brick.Widgets.Core as W
+import qualified Brick.Widgets.Dialog as W
 import qualified Control.Lens as L
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
@@ -194,8 +196,16 @@ runSelectionApp dps = do
       , appAttrMap = emptyAttrMap
       }
 
-selectionAppDraw :: a
-selectionAppDraw = undefined
+selectionAppDraw :: NonEmpty a -> Int -> [Brick.Widget n]
+selectionAppDraw ds i =
+  [ W.renderDialog
+    ( W.dialog
+      (Just " Which choice should be made? ")
+      (Just (i, buttons))
+      80
+    ) W.emptyWidget
+  ]
+  where buttons = zipWith (\z d -> (show z, d)) [0 ..] (NE.toList ds)
 
 selectionAppHandleEvent
   :: Int -- ^ Length of the list
@@ -208,8 +218,16 @@ selectionAppHandleEvent len i = \case
   KeyPress Vty.KEnter -> Brick.halt i
   _                   -> Brick.continue i
 
-saveSelectionAppDraw :: a
-saveSelectionAppDraw = undefined
+saveSelectionAppDraw :: p -> SaveSelection -> [Brick.Widget n]
+saveSelectionAppDraw _ ss =
+  [ W.renderDialog
+    ( W.dialog
+      (Just " Would you like to save this choice for the future? ")
+      (Just (if ss == SaveSelection then 0 else 1, buttons))
+      60
+    ) W.emptyWidget
+  ]
+  where buttons = [("Yes", SaveSelection), ("No", DontSaveSelection)]
 
 saveSelectionAppHandleEvent
   :: SaveSelection
@@ -230,23 +248,3 @@ newtype SaveSelection = MkSaveSelection Bool
 pattern SaveSelection, DontSaveSelection :: SaveSelection
 pattern SaveSelection = MkSaveSelection True
 pattern DontSaveSelection = MkSaveSelection False
-
--- -- |
--- --
--- -- TODO: Create a simple Brick app to let the user pick what they want.
--- -- Further, ask them if they'd like you to save that default for future
--- -- operations. autoSelection is only used as a stop-gap solution.
--- userSelection
---   :: [ManPageSummary] -> [HelpPageSummary] -> Startup (DocPage, SaveSelection)
--- userSelection = autoSelection
-
--- autoSelection
---   :: [ManPageSummary] -> [HelpPageSummary] -> Startup (DocPage, SaveSelection)
--- autoSelection ms hs = liftIO $ (, DontSaveSelection) <$>
---   case ms of
---     m:_ -> getManPage m
---     []  -> case hs of
---       h:_ -> getHelpPage h
---       []  -> error "Error: Couldn't find a man page or help page."
---       -- TODO: Improve this error. For starters, we should pluck out the name of
---       -- the input from the monad.
