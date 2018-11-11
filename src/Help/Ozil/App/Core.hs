@@ -25,8 +25,6 @@ import Help.Ozil.App.Config.Watch (WatchManager, FSEvent)
 import Help.Ozil.App.Config.Types (Config)
 import Help.Ozil.App.Cmd (Options)
 
-import qualified Help.Ozil.App.Default as Default
-
 import Brick (App (..))
 import Brick.BChan (BChan)
 

@@ -1,6 +1,5 @@
 module Commons
-  (
-    module Control.Exception
+  ( module Control.Exception
   , module Control.Lens
   , module Control.Lens.TH
   , module Control.Monad

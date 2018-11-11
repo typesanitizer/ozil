@@ -1,8 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE ViewPatterns #-}
-
 module Help.Ozil.App.Startup
   ( finishStartup
   ) where
@@ -149,7 +144,6 @@ getManPage (ManPageSummary descr) = do
     else T.readFile path
   pure (Man (parseMan txt))
 
-
 getShortHelp :: FilePath -> IO (Maybe Text)
 getShortHelp p = readProcessSimple p ["-h"]
 
@@ -178,14 +172,15 @@ runSelectionApp dps = do
   ss <- Brick.defaultMain (saveSelectionApp dp) DontSaveSelection
   pure (dp, ss)
   where
-    emptyAttrMap = const $ Brick.attrMap Vty.defAttr []
+    highlightSelection = Brick.attrMap Vty.defAttr
+      [(W.buttonSelectedAttr, Vty.withStyle Vty.defAttr Vty.standout)]
     selectionApp :: Int -> NonEmpty DocPageSummary -> App Int () Int
     selectionApp len ds = App
       { appDraw = selectionAppDraw ds
       , appChooseCursor = Brick.showFirstCursor
       , appHandleEvent = selectionAppHandleEvent len
       , appStartEvent = pure
-      , appAttrMap = emptyAttrMap
+      , appAttrMap = const highlightSelection
       }
     saveSelectionApp :: DocPageSummary -> App SaveSelection () Int
     saveSelectionApp dp = App
@@ -193,7 +188,7 @@ runSelectionApp dps = do
       , appChooseCursor = Brick.showFirstCursor
       , appHandleEvent = saveSelectionAppHandleEvent
       , appStartEvent = pure
-      , appAttrMap = emptyAttrMap
+      , appAttrMap = const highlightSelection
       }
 
 selectionAppDraw :: NonEmpty a -> Int -> [Brick.Widget n]
@@ -213,8 +208,8 @@ selectionAppHandleEvent
   -> Brick.BrickEvent n e
   -> Brick.EventM n' (Brick.Next Int)
 selectionAppHandleEvent len i = \case
-  KeyPress Vty.KDown  | i + 1 < len -> Brick.continue (i + 1)
-  KeyPress Vty.KUp    | i > 0       -> Brick.continue (i - 1)
+  KeyPress Vty.KLeft  | i > 0       -> Brick.continue (i - 1)
+  KeyPress Vty.KRight | i + 1 < len -> Brick.continue (i + 1)
   KeyPress Vty.KEnter -> Brick.halt i
   _                   -> Brick.continue i
 
