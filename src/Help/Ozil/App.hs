@@ -118,5 +118,6 @@ ui s = Border.borderWithLabel (Brick.txt header) $
   where
     header = T.snoc (T.cons ' ' (s ^. heading)) ' '
     body = Page.render (s ^. doc)
-      & Brick.txtWrap
       & Brick.viewport TextViewport Brick.Vertical
+      -- & Brick.txtWrap
+      -- & Brick.viewport TextViewport Brick.Vertical

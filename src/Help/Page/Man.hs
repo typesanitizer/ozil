@@ -2,7 +2,6 @@ module Help.Page.Man where
 
 import Commons
 
-import Help.Page.Help (Optional)
 import Text.Megaparsec (Parsec, some, (<|>), between, parseMaybe)
 import Text.Megaparsec.Char (anyChar, space1, char, alphaNumChar)
 

@@ -9,12 +9,14 @@ module Commons
   , module Data.List.NonEmpty
   , module Data.Maybe
   , module Data.Text
+  , module Data.Vector
   , module Data.Void
   , module GHC.Stack
   , module Text.Printf
   , readProcessSimple
   , headMaybe
   , pattern KeyPress
+  , Optional
   )
   where
 
@@ -28,6 +30,7 @@ import Data.Function ((&), on)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe
 import Data.Text (Text, pack, unpack)
+import Data.Vector (Vector)
 import Data.Void
 import GHC.Stack (HasCallStack)
 import Text.Printf (printf)
@@ -50,3 +53,5 @@ headMaybe = listToMaybe
 
 pattern KeyPress :: Vty.Key -> Brick.BrickEvent n e
 pattern KeyPress k = Brick.VtyEvent (Vty.EvKey k [])
+
+type Optional = Maybe Text

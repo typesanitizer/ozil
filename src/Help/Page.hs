@@ -1,9 +1,16 @@
 module Help.Page where
 
-import Help.Page.Man
-import Help.Page.Help
+import Commons
 
-import Data.Text (Text)
+import Help.Page.Man
+  ( emptyManPage, ManPage (..), WhatisDescription (..), parseWhatisDescription )
+import Help.Page.Help (HelpPage (..), Item (Plain))
+
+import Brick (Widget)
+
+import qualified Brick
+import qualified Data.Text as T
+import qualified Data.Vector as V
 
 --------------------------------------------------------------------------------
 -- * Pages
@@ -34,9 +41,9 @@ data DocPageSummary
 -- TODO: Improve this...
 parseLongHelp :: Text -> HelpPage
 parseLongHelp txt = HelpPage
-  { _helpPageHeading = Nothing
+  { _helpPageHeading  = Nothing
   , _helpPageSynopsis = Nothing
-  , _helpPageRest = txt
+  , _helpPageBody     = V.singleton (Plain txt)
   }
 
 -- TODO: Improve this...
@@ -47,7 +54,10 @@ parseMan :: Text -> ManPage
 parseMan txt = emptyManPage { _manPageRest = txt }
 
 -- TODO: Improve this...
-render :: DocPage -> Text
-render (Man m) = _manPageRest m
-render (LongHelp (HelpPage _ _ x)) = x
-render (ShortHelp (HelpPage _ _ x)) = x
+render :: DocPage -> Widget n
+render = \case
+  Man m -> Brick.txtWrap (_manPageRest m)
+  LongHelp (HelpPage _ _ x) -> Brick.txtWrap (getPlain x)
+  ShortHelp (HelpPage _ _ x) -> Brick.txtWrap (getPlain x)
+  where
+    getPlain v = T.concat [t | Plain t <- V.toList v]

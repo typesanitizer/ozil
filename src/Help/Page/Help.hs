@@ -1,11 +1,15 @@
 module Help.Page.Help where
 
-import Data.Text (Text)
-
-type Optional = Maybe Text
+import Commons
 
 data HelpPage = HelpPage
-  { _helpPageHeading :: Optional
+  { _helpPageHeading  :: Optional
   , _helpPageSynopsis :: Optional -- ^ Equivalent to "usage"
-  , _helpPageRest :: Text
+  , _helpPageBody     :: Vector Item
   }
+
+-- TODO: Maybe we should record offsets here?
+data Item
+  = Subcommand { _name :: Text, _description :: Text }
+  | Flags      { _name :: Text, _description :: Text }
+  | Plain Text
