@@ -164,49 +164,41 @@ getHelpPage (HelpPageSummary binpath short _) =
 -- * Selection process
 
 -- Precondition: The input list has 2+ elements.
-runSelectionApp :: NonEmpty DocPageSummary -> IO (DocPageSummary, SaveSelection)
+runSelectionApp
+  :: HasCallStack
+  => NonEmpty DocPageSummary
+  -> IO (DocPageSummary, SaveSelection)
 runSelectionApp dps = do
-  SelectionState (dp:|_) ss d <-
-    Brick.defaultMain selectionApp (SelectionState dps DontSaveSelection Mid)
-  assert (d == Done) (pure (dp, ss))
+  dp :| tl <- Brick.defaultMain selectionApp dps
+  assert (null tl) (pure ())
+  ss <- Brick.defaultMain (saveSelectionApp dp) DontSaveSelection
+  pure (dp, ss)
   where
-    selectionApp :: App SelectionState () Int
+    emptyAttrMap = const $ Brick.attrMap Vty.defAttr []
+    selectionApp :: App (NonEmpty DocPageSummary) () Int
     selectionApp = App
       { appDraw = selectionAppDraw
       , appChooseCursor = Brick.showFirstCursor
       , appHandleEvent = selectionAppHandleEvent
       , appStartEvent = pure
-      , appAttrMap = const $ Brick.attrMap Vty.defAttr []
+      , appAttrMap = emptyAttrMap
+      }
+    saveSelectionApp :: DocPageSummary -> App SaveSelection () Int
+    saveSelectionApp dp = App
+      { appDraw = saveSelectionAppDraw dp
+      , appChooseCursor = Brick.showFirstCursor
+      , appHandleEvent = saveSelectionAppHandleEvent
+      , appStartEvent = pure
+      , appAttrMap = emptyAttrMap
       }
 
-data Status = Mid | Done
-  deriving Eq
+selectionAppHandleEvent = undefined
 
-data SelectionState = SelectionState
-  { blurbs     :: NonEmpty DocPageSummary
-  , saveChoice :: !SaveSelection
-  , status     :: Status
-  }
+selectionAppDraw = undefined
 
-selectionAppDraw :: HasCallStack => SelectionState -> [Brick.Widget Int]
-selectionAppDraw = \case
-  SelectionState b _ Mid  -> drawSelectionUI b
-  SelectionState (b :| tl) _ Done -> assert (null tl) (drawSaveDefaultUI b)
-  where
-    drawSelectionUI = undefined
-    drawSaveDefaultUI = undefined
+saveSelectionAppDraw = undefined
 
-selectionAppHandleEvent
-  :: HasCallStack
-  => SelectionState
-  -> Brick.BrickEvent Int e
-  -> Brick.EventM Int (Brick.Next SelectionState)
-selectionAppHandleEvent s e = case s of
-  SelectionState b _ Mid -> handleSelection b e
-  SelectionState (b :| tl) _ Done -> assert (null tl) (handleSaving b e)
-  where
-    handleSelection = undefined
-    handleSaving = undefined
+saveSelectionAppHandleEvent = undefined
 
 newtype SaveSelection = MkSaveSelection Bool
 
