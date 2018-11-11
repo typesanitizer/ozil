@@ -5,9 +5,10 @@ porcelain for `man`/`--help` + `less`/`more`/`most`.
 
 ## Features
 
-- [X] A top, top-qualitee name.
+- [X] A top, top qualitee name.
 - [ ] Transparently works with man pages and help pages (typically accessed with
-  `--help` or `-h`). [TODO: Insert GIF]
+  `--help` or `-h`).
+  - [TODO: Insert GIF]
 - [ ] Follow links inside man/help pages with hints.
   - TODO: insert GIF
 - [ ] Automatic detection of subcommand help pages.
@@ -54,3 +55,7 @@ as well :smile:.
 
 - Currently `ozil` depends on `man` for path handling; it doesn't duplicate
   databases or go hunting for files by itself. This may change in the future.
+
+### Non-Goals
+
+- Be a 1-to-1 replacement for `man` or `less`.
