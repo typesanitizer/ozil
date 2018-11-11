@@ -13,9 +13,17 @@ data DocPage
   | LongHelp { _longHelpPage :: HelpPage }
   | ShortHelp { _shortHelpPage :: HelpPage }
 
-newtype ManPageInfo = ManPageInfo { _shortDescription :: String }
+newtype ManPageSummary = ManPageSummary { shortDescription :: String }
 
-newtype HelpPageInfo = HelpPageInfo { _binaryPath :: FilePath }
+data HelpPageSummary = HelpPageSummary
+  { binaryPath         :: FilePath
+  , shortHelpAvailable :: !Bool
+  , shortHelpText      :: Text
+  }
+
+data DocPageSummary
+  = ManSummary  !ManPageSummary
+  | HelpSummary !HelpPageSummary
 
 -- TODO: Improve this...
 parseLongHelp :: Text -> HelpPage
@@ -30,7 +38,7 @@ parseShortHelp :: Text -> HelpPage
 parseShortHelp = parseLongHelp
 
 parseMan :: Text -> ManPage
-parseMan txt = emptyManPage & set rest txt
+parseMan txt = emptyManPage { _manPageRest = txt }
 
 -- TODO: Improve this...
 render :: DocPage -> Text

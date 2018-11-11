@@ -5,10 +5,10 @@ import Commons
 oDie :: (HasCallStack, MonadIO m) => String -> m a
 oDie = liftIO . error
 
-unreachableErrorM :: MonadIO m => m a
+unreachableErrorM :: (HasCallStack, MonadIO m) => m a
 unreachableErrorM = oDie "Unreachable code!"
 
-unreachableError :: a
+unreachableError :: HasCallStack => a
 unreachableError = error "Unreachable code!"
 
 unimplementedErrorM :: (HasCallStack, MonadIO m) => m a
@@ -16,3 +16,8 @@ unimplementedErrorM = oDie "Unimplemented :("
 
 unimplementedError :: HasCallStack => a
 unimplementedError = error "Unimplemented :("
+
+fromJust' :: HasCallStack => Maybe a -> a
+fromJust' = \case
+  Just x  -> x
+  Nothing -> unreachableError

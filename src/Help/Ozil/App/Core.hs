@@ -9,7 +9,7 @@ module Help.Ozil.App.Core
   , OEvent (..)
   , OResource (..)
   , OState
-  , HasText (..)
+  , HasDoc (..)
   , HasHeading (..)
   , config
   , watch
@@ -20,7 +20,8 @@ module Help.Ozil.App.Core
 
 import Commons
 
-import Help.Ozil.App.Config.Watch
+import Help.Page (DocPage)
+import Help.Ozil.App.Config.Watch (WatchManager, FSEvent)
 import Help.Ozil.App.Config.Types (Config)
 import Help.Ozil.App.Cmd (Options)
 
@@ -48,7 +49,7 @@ data OWatch
 data OState = OState
   { oStateOptions  :: !Options
   , _oStateConfig  :: !Config
-  , _oStateText    :: !Text
+  , _oStateDoc     :: !DocPage
   , _oStateWatch   :: !OWatch
   , oStateChan     :: !(BChan OEvent)
   , _oStateHeading :: !Text
@@ -61,11 +62,17 @@ getOptions = oStateOptions
 getBChan :: OState -> BChan OEvent
 getBChan = oStateChan
 
-newOState :: Options -> WatchManager -> BChan OEvent -> OState
-newOState opts wm ch = OState
+newOState
+  :: Options
+  -> WatchManager
+  -> BChan OEvent
+  -> DocPage
+  -> Config
+  -> OState
+newOState opts wm ch dp cfg = OState
   { oStateOptions  = opts
-  , _oStateConfig  = Default.config
-  , _oStateText    = "Placeholder text"
+  , _oStateConfig  = cfg
+  , _oStateDoc     = dp
   , _oStateWatch   = Uninitialized wm
   , oStateChan     = ch
   , _oStateHeading = "binaryname"

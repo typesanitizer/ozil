@@ -3,12 +3,10 @@
 
 module Help.Ozil.App.Cmd.Types
   ( module Help.Ozil.App.Cmd.Types
-  , NonEmpty (..)
   ) where
 
 import Control.Lens (Iso', iso)
 import Control.Lens.TH (makeFields, makePrisms)
-import Data.List.NonEmpty (NonEmpty (..))
 
 data ConfigOptions
   = ConfigInit   -- ^ Initialize a config file.
@@ -57,7 +55,7 @@ data InputFile
 
 data DefaultOptions = DefaultOptions
   { _defaultOptionsAutofind :: !Bool
-  , _defaultOptionsInputs :: !(NonEmpty InputFile)
+  , _defaultOptionsInputs   :: !InputFile
   } deriving Show
 
 data Query = QueryDefault | QueryFull
@@ -72,9 +70,9 @@ data WhatIsOptions = WhatIsOptions
 
 -- | Subcommand under use.
 data Command
-  = Config !ConfigOptions
+  = Config  !ConfigOptions
   | Default !DefaultOptions -- ^ Default ==> run viewer
-  | WhatIs !WhatIsOptions   -- ^ WhatIs equivalent
+  | WhatIs  !WhatIsOptions   -- ^ WhatIs equivalent
   -- | Db !DbOptions
   deriving Show
 

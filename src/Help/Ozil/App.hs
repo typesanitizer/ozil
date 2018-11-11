@@ -21,9 +21,11 @@ import qualified Graphics.Vty as Vty
 import qualified System.FSNotify as FSNotify
 
 main :: IO ()
-main = defaultMain $ \opts -> FSNotify.withManager $ \wm -> do
-  chan <- BChan.newBChan maxChanSize
-  saveState $ Brick.customMain gui (Just chan) oapp (newOState opts wm chan)
+main = defaultMain $ \opts -> do
+  (dp, cfg) <- finishStartup opts
+  FSNotify.withManager $ \wm -> do
+    chan <- BChan.newBChan maxChanSize
+    saveState $ Brick.customMain gui (Just chan) oapp (newOState opts wm chan dp cfg)
   where
     gui = Vty.mkVty Vty.defaultConfig
     maxChanSize = 20
@@ -56,20 +58,12 @@ ozilStartEvent :: OState -> Brick.EventM OResource OState
 ozilStartEvent s = case s ^. watch of
   Running _ -> pure s
   Uninitialized wm -> do
-    -- TODO: Write path creating logic
-    -- mkdir with parents
-    -- Tell user that you made a directory :)
-    -- Pause for a bit so they can read the message :)
-    -- Go ahead.
-    (dp, config', sw) <- liftIO $ do
-      -- TODO: Actually remember the selection if we're supposed to do so.
-      ((dp, _), config') <- finishStartup (getOptions s)
-      sw <- FSNotify.watchDir wm Default.configDir toReactOrNotToReact forwardEvent
-      pure (dp, config', sw)
-    pure $ s
-      & set text (Page.render dp)
-      & set watch (Running sw)
-      & set config config'
+    --   ((dp, _), config') <- finishStartup (getOptions s)
+    sw <- liftIO $
+      FSNotify.watchDir wm Default.configDir toReactOrNotToReact forwardEvent
+    pure (set watch (Running sw) s)
+      -- & set text (Page.render dp)
+      -- & set config config'
   where
     forwardEvent :: FSEvent -> IO ()
     forwardEvent = BChan.writeBChan (getBChan s) . OEvent
@@ -114,7 +108,7 @@ handleEvent s = \case
 -- +-----------------------+
 --
 -- ui :: (Show n, Ord n) => Brick.Widget n
-ui :: (HasText s Text, HasHeading s Text) => s -> Brick.Widget OResource
+ui :: (HasDoc s Page.DocPage, HasHeading s Text) => s -> Brick.Widget OResource
 ui s = Border.borderWithLabel (Brick.txt header) $
   body
   Brick.<=>
@@ -123,6 +117,6 @@ ui s = Border.borderWithLabel (Brick.txt header) $
   Brick.txt "Esc/q = Exit  k/↑ = Up  j/↓ = Down"
   where
     header = T.snoc (T.cons ' ' (s ^. heading)) ' '
-    body = s ^. text
+    body = Page.render (s ^. doc)
       & Brick.txtWrap
       & Brick.viewport TextViewport Brick.Vertical

@@ -6,7 +6,6 @@ import Help.Ozil.App.Cmd.Types
 
 import Options.Applicative
 
-import Data.List.NonEmpty (NonEmpty (..))
 import System.FilePath (isPathSeparator, takeExtension)
 import Text.Printf (printf)
 
@@ -85,14 +84,12 @@ defaultOptionsP =
                \then ozil will automatically check project binaries for \
                \matches."
           )
-    <*> (   (:| [])
-        <$> ( toInputFile <$> strArgument
-              (  metavar "<file>"
-              <> help
-                 "Input: can be a binary name (e.g. gcc), or a man page \
-                 \(e.g. gcc.1 or gcc.1.gz) or a path (e.g. foo/a.out)."
-              )
-            )
+    <*> ( toInputFile <$> strArgument
+          (  metavar "<file>"
+            <> help
+            "Input: can be a binary name (e.g. gcc), or a man page \
+            \(e.g. gcc.1 or gcc.1.gz) or a path (e.g. foo/a.out)."
+          )
         )
  where
   offSwitch = fmap not . switch
