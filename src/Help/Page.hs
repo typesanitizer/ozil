@@ -4,7 +4,7 @@ import Commons
 
 import Help.Page.Man
   ( emptyManPage, ManPage (..), WhatisDescription (..), parseWhatisDescription )
-import Help.Page.Help (HelpPage (..), Item (Plain), parsePickAnchors)
+import Help.Page.Help (HelpPage (..), Item (..), parsePickAnchors)
 
 import Brick (Widget)
 
@@ -59,7 +59,11 @@ parseMan txt = emptyManPage { _manPageRest = txt }
 render :: DocPage -> Widget n
 render = \case
   Man m -> Brick.txtWrap (_manPageRest m)
-  LongHelp (HelpPage _ _ x _) -> Brick.txtWrap (getPlain x)
-  ShortHelp (HelpPage _ _ x _) -> Brick.txtWrap (getPlain x)
+  LongHelp (HelpPage _ _ x _) -> ws x
+  ShortHelp (HelpPage _ _ x _) -> ws x
   where
-    getPlain v = T.concat [t | Plain t <- V.toList v]
+    ws v = Brick.vBox $ map renderItem (V.toList v)
+    renderItem = \case
+      Plain t -> Brick.txtWrap t
+      Flags it ds -> Brick.hBox [Brick.txtWrap it, Brick.txtWrap ds]
+      Subcommand it ds -> Brick.vBox [Brick.txtWrap it, Brick.txtWrap ds]

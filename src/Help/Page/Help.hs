@@ -67,6 +67,7 @@ parsePickAnchors txt =
   & V.fromList
   & (, V.empty)
   where
+    -- This function should really be called esPlain ;)
     isPlain (Plain _) = True
     isPlain _ = False
     groupConcatPlains (Plain t : its) =
