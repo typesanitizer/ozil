@@ -8,7 +8,7 @@ import Commons
 
 import Control.Lens (makeLenses)
 import Control.Monad.State.Strict
-import Data.Char (isAlphaNum)
+import Data.Char (isAlphaNum, isUpper)
 import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 
@@ -75,12 +75,12 @@ twoColumn lx ctor itemP = do
   let descIndent = fmap descrIndent saved
   guard (eqIfJust descIndent descCol)
   firstLine <- descrLine
-  let nextLineP = many $ do
+  let nextLineP = try $ do
         space1
         descCol' <- getColumn
         guard (descCol' == descCol)
         descrLine
-  nextLines <- try nextLineP <|> pure []
+  nextLines <- many nextLineP
   let descr = T.intercalate " " (firstLine : nextLines)
   -- Record positions and finish assembly
   when (isNothing saved)
@@ -88,19 +88,40 @@ twoColumn lx ctor itemP = do
   pure (ctor itm descr)
   where
     -- Use lookAhead to avoid treating the synopsis as a subcommand.
-    descrLine = lookAhead alphaNumChar *> takeWhile1P Nothing (/= '\n') <* newline
+    descrLine =
+      lookAhead (notChar '[') *> takeWhile1P Nothing (/= '\n') <* newline
 
 subcommandP :: Parser Item
 subcommandP =
-  twoColumn subcommandIndent Subcommand (takeWhile1P Nothing isAlphaNum)
+  twoColumn subcommandIndent Subcommand
+    (lookAhead letterChar
+     *> takeWhile1P Nothing (\c -> c == '-' || isAlphaNum c))
+
+flagP :: Parser Item
+flagP = twoColumn flagIndent Flags flagP'
+  where
+    gobble :: Parser a -> Parser Text
+    gobble lk = lookAhead lk *> takeWhile1P Nothing (/= ' ')
+    flagP' = do
+      first <- gobble (char '-')
+      let next = try $ do
+            space1
+            gobble (satisfy (\c -> c == '[' || c == '<' || c == '-')
+                    <|> (satisfy isUpper *> satisfy isUpper))
+      nextStuff <- many next
+      let flags = T.intercalate " " (first : nextStuff)
+      pure flags
 
 singleLineP :: Parser Item
 singleLineP = Plain . flip T.snoc '\n'
   <$> (takeWhile1P Nothing (/= '\n') <* optional newline)
 
 helpP :: Parser [Item]
-helpP = some (nl <|> try subcommandP <|> singleLineP) <* optional eof
-  where nl = Plain . T.singleton <$> char '\n'
+helpP =
+  some (nl <|> try flagP <|> try subcommandP <|> singleLineP)
+  <* optional eof
+  where
+    nl = Plain . T.singleton <$> char '\n'
 
 parsePickAnchors :: HasCallStack => Text -> (Vector Item, UVector Int)
 parsePickAnchors t = (, V.empty)
