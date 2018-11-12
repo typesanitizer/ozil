@@ -9,14 +9,12 @@ import Commons
 import Control.Lens (makeLenses)
 import Control.Monad.State.Strict
 import Data.Char (isAlphaNum)
-import Data.Either (fromRight)
 import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 
 import qualified Control.Lens as L
 import qualified Data.Text as T
 import qualified Data.Vector.Generic as V
-import qualified Debug.Trace as D
 
 data HelpPage = HelpPage
   { _helpPageHeading  :: Optional
@@ -47,8 +45,11 @@ type Parser = ParsecT () Text (State IndentGuess)
 getColumn :: MonadParsec e s m => m Int
 getColumn = unPos . sourceColumn <$> getPosition
 
-runHelpParser :: Parser a -> Text -> Either (ParseError Char ()) a
-runHelpParser p txt = evalState (runParserT p "" txt) (IndentGuess Nothing Nothing)
+runHelpParser :: Parser a -> Text -> (Either (ParseError Char ()) a, IndentGuess)
+runHelpParser p txt = runState (runParserT p "" txt) (IndentGuess Nothing Nothing)
+
+evalHelpParser :: Parser a -> Text -> Either (ParseError Char ()) a
+evalHelpParser a b = fst (runHelpParser a b)
 
 eqIfJust :: Eq a => Maybe a -> a -> Bool
 eqIfJust Nothing  _ = True
@@ -74,11 +75,12 @@ twoColumn lx ctor itemP = do
   let descIndent = fmap descrIndent saved
   guard (eqIfJust descIndent descCol)
   firstLine <- descrLine
-  nextLines <- many $ do
-    space1
-    descCol' <- getColumn
-    guard (descCol' == descCol)
-    descrLine
+  let nextLineP = many $ do
+        space1
+        descCol' <- getColumn
+        guard (descCol' == descCol)
+        descrLine
+  nextLines <- try nextLineP <|> pure []
   let descr = T.intercalate " " (firstLine : nextLines)
   -- Record positions and finish assembly
   when (isNothing saved)
@@ -93,17 +95,15 @@ subcommandP =
   twoColumn subcommandIndent Subcommand (takeWhile1P Nothing isAlphaNum)
 
 singleLineP :: Parser Item
-singleLineP = Plain <$>
-  ( (T.singleton <$> char '\n')
-    <|>
-    (flip T.snoc '\n' <$> (takeWhile1P Nothing (/= '\n') <* optional newline))
-  )
+singleLineP = Plain . flip T.snoc '\n'
+  <$> (takeWhile1P Nothing (/= '\n') <* optional newline)
 
 helpP :: Parser [Item]
-helpP = some singleLineP <* optional eof
+helpP = some (nl <|> try subcommandP <|> singleLineP) <* optional eof
+  where nl = Plain . T.singleton <$> char '\n'
 
 parsePickAnchors :: HasCallStack => Text -> (Vector Item, UVector Int)
 parsePickAnchors t = (, V.empty)
   $ V.fromList
   $ (\case Right x -> x; Left y -> error (show y))
-  $ runHelpParser helpP t
+  $ evalHelpParser helpP t
