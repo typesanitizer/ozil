@@ -22,7 +22,7 @@ module Commons
   where
 
 import Control.Exception (assert)
-import Control.Lens ((^.), (^?), (<&>), view, set, over)
+import Control.Lens ((^.), (^?), (<&>), view, set, over, _1, _2)
 import Control.Lens.TH (makeFields)
 import Control.Monad (when, void, join, forM, forM_)
 import Control.Monad.IO.Class
