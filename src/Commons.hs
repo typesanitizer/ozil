@@ -10,6 +10,7 @@ module Commons
   , module Data.Maybe
   , module Data.Text
   , module Data.Vector
+  , UVector
   , module Data.Void
   , module GHC.Stack
   , module Text.Printf
@@ -31,6 +32,7 @@ import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe
 import Data.Text (Text, pack, unpack)
 import Data.Vector (Vector)
+import qualified Data.Vector.Unboxed
 import Data.Void
 import GHC.Stack (HasCallStack)
 import Text.Printf (printf)
@@ -40,6 +42,8 @@ import System.Exit (ExitCode (..))
 
 import qualified Brick
 import qualified Graphics.Vty as Vty
+
+type UVector = Data.Vector.Unboxed.Vector
 
 readProcessSimple :: FilePath -> [String] -> IO (Maybe Text)
 readProcessSimple p s = do

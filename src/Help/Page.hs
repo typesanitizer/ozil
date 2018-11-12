@@ -4,13 +4,13 @@ import Commons
 
 import Help.Page.Man
   ( emptyManPage, ManPage (..), WhatisDescription (..), parseWhatisDescription )
-import Help.Page.Help (HelpPage (..), Item (Plain))
+import Help.Page.Help (HelpPage (..), Item (Plain), parsePickAnchors)
 
 import Brick (Widget)
 
 import qualified Brick
 import qualified Data.Text as T
-import qualified Data.Vector as V
+import qualified Data.Vector.Generic as V
 
 --------------------------------------------------------------------------------
 -- * Pages
@@ -43,8 +43,10 @@ parseLongHelp :: Text -> HelpPage
 parseLongHelp txt = HelpPage
   { _helpPageHeading  = Nothing
   , _helpPageSynopsis = Nothing
-  , _helpPageBody     = V.singleton (Plain txt)
+  , _helpPageBody     = items
+  , _helpPageAnchors  = anchors
   }
+  where (items, anchors) = parsePickAnchors txt
 
 -- TODO: Improve this...
 parseShortHelp :: Text -> HelpPage
@@ -57,7 +59,7 @@ parseMan txt = emptyManPage { _manPageRest = txt }
 render :: DocPage -> Widget n
 render = \case
   Man m -> Brick.txtWrap (_manPageRest m)
-  LongHelp (HelpPage _ _ x) -> Brick.txtWrap (getPlain x)
-  ShortHelp (HelpPage _ _ x) -> Brick.txtWrap (getPlain x)
+  LongHelp (HelpPage _ _ x _) -> Brick.txtWrap (getPlain x)
+  ShortHelp (HelpPage _ _ x _) -> Brick.txtWrap (getPlain x)
   where
     getPlain v = T.concat [t | Plain t <- V.toList v]
