@@ -4,9 +4,10 @@ import Commons
 
 import Help.Page.Man
   ( emptyManPage, ManPage (..), WhatisDescription (..), parseWhatisDescription )
-import Help.Page.Help (HelpPage (..), Item (..), parsePickAnchors)
+import Help.Page.Help
 
-import Brick (Widget)
+import Brick hiding (txt)
+import Brick.Widgets.Border (border)
 
 import qualified Brick
 import qualified Data.Text as T
@@ -55,15 +56,23 @@ parseShortHelp = parseLongHelp
 parseMan :: Text -> ManPage
 parseMan txt = emptyManPage { _manPageRest = txt }
 
--- TODO: Improve this...
 render :: DocPage -> Widget n
 render = \case
-  Man m -> Brick.txtWrap (_manPageRest m)
+  Man m -> txtWrap (_manPageRest m)
   LongHelp (HelpPage _ _ x _) -> ws x
   ShortHelp (HelpPage _ _ x _) -> ws x
   where
-    ws v = Brick.vBox $ map renderItem (V.toList v)
+    ws v = vBox $ map renderItem (V.toList v)
     renderItem = \case
-      Plain t -> Brick.txtWrap t
-      Flags it ds -> Brick.hBox [Brick.txtWrap it, Brick.txtWrap ds]
-      Subcommand it ds -> Brick.vBox [Brick.txtWrap it, Brick.txtWrap ds]
+      Plain t -> txtWrap t
+      Tabular _ ents inds -> vBox . V.toList $ V.map (renderEntry inds) ents
+    defaultPadding = 4
+    renderEntry (ItemIndent ii di) (TableEntry itm descr) =
+      let n = textWidth itm
+          iw = txtWrap itm
+          itemFits = ii + n < di
+          delta_x = if itemFits then di - ii - n else 4
+          extraIndent = hLimit delta_x (vLimit 1 (fill ' '))
+          dw = hBox [extraIndent, hLimit (if itemFits then 55 else 66) $ txtWrap descr]
+          lyt = if itemFits then hBox else padTopBottom 1 . vBox
+      in padLeftRight defaultPadding (lyt [iw, dw])

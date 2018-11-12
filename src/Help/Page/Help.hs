@@ -2,7 +2,9 @@
 {-# LANGUAGE RankNTypes      #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Help.Page.Help (HelpPage (..), Item (..), parsePickAnchors) where
+module Help.Page.Help
+  ( HelpPage (..), Item (..), ItemIndent (..), TableEntry (..), parsePickAnchors
+  ) where
 
 import Commons
 
@@ -27,11 +29,20 @@ data HelpPage = HelpPage
   , _helpPageAnchors  :: UVector Int
   }
 
+data TableType = Flag | Subcommand
+  deriving (Eq, Show)
+
 -- TODO: Maybe we should record offsets here?
 data Item
   = Plain Text
-  | Flags      { _name :: Text, _description :: Text }
-  | Subcommand { _name :: Text, _description :: Text }
+  | Tabular
+    { _tableType :: !TableType
+    , _entries   :: Vector TableEntry
+    , _indents   :: !ItemIndent
+    }
+  deriving Show
+
+data TableEntry = TableEntry { _name :: !Text, _description :: !Text }
   deriving Show
 
 data ItemIndent = ItemIndent { itemIndent :: !Int, descrIndent ::  !Int }
@@ -63,18 +74,21 @@ parsePickAnchors :: HasCallStack => Text -> (Vector Item, UVector Int)
 parsePickAnchors txt =
   evalHelpParser helpP txt
   & (\case Right x -> x; Left y -> error (show y))
-  & chop groupConcatPlains
+  & chop groupConcat
   & V.fromList
   & (, V.empty)
   where
     -- This function should really be called esPlain ;)
     isPlain (Plain _) = True
     isPlain _ = False
-    groupConcatPlains (Plain t : its) =
-      let (plains, rest) = span isPlain its in
+    isTabular tt (Tabular tt' _ _) = tt == tt'
+    isTabular _ _ = False
+    groupConcat [] = (undefined, []) -- This case won't be called...
+    groupConcat (itm : itms) = case itm of
+      Plain t -> let (plains, rest) = span isPlain itms in
         (Plain (T.concat (t : map (\(Plain t') -> t') plains)), rest)
-    groupConcatPlains (x : xs) = (x, xs)
-    groupConcatPlains [] = (undefined, []) -- This case won't be called...
+      Tabular tt tes _ -> let (tes', rest) = span (isTabular tt) itms in
+        (itm {_entries = V.concat (tes : map _entries tes')}, rest)
 
 helpP :: Parser [Item]
 helpP =
@@ -118,7 +132,7 @@ subcommandTextP =
 flagP :: Parser Item
 flagP =
   twoColumn
-    Flags
+    Flag
     flagTextP
     (\s -> let (x, y) = s ^. flagIndent in fmap itemIndent x :| [y])
     (flagIndent . _1)
@@ -149,13 +163,13 @@ flagTextP = do
 
 twoColumn
   :: (MonadParsec e Text m, MonadState IndentGuess m)
-  => (Text -> Text -> Item)                  -- ^ Item constructor
+  => TableType                               -- ^ Item constructor
   -> m Text                                  -- ^ Item parser
   -> (IndentGuess -> NonEmpty (Maybe Int))   -- ^ Item alignments
   -> L.Getter IndentGuess (Maybe ItemIndent) -- ^ Getter for description indent
   -> (Int -> Int -> IndentGuess -> m ())     -- ^ Save state at the end.
   -> m Item
-twoColumn ctor itemP itmIndentsIn lx saveIndents = do
+twoColumn tt itemP itmIndentsIn lx saveIndents = do
   -- First get the item
   space1
   itmCol <- getColumn
@@ -170,7 +184,7 @@ twoColumn ctor itemP itmIndentsIn lx saveIndents = do
   -- Save indentations (if applicable)
   saveIndents itmCol descCol s
   -- Done
-  pure (ctor itm descr)
+  pure (Tabular tt (V.singleton (TableEntry itm descr)) (ItemIndent itmCol descCol))
 
 descriptionP
   :: MonadParsec e Text m
