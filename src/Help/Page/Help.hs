@@ -11,6 +11,7 @@ import Help.Ozil.App.Death (unreachableError)
 import Control.Lens (makeLenses)
 import Control.Monad.State.Strict
 import Data.Char (isAlphaNum, isUpper)
+import Data.List.Split (chop)
 import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 
@@ -28,9 +29,9 @@ data HelpPage = HelpPage
 
 -- TODO: Maybe we should record offsets here?
 data Item
-  = Subcommand { _name :: Text, _description :: Text }
+  = Plain Text
   | Flags      { _name :: Text, _description :: Text }
-  | Plain Text
+  | Subcommand { _name :: Text, _description :: Text }
   deriving Show
 
 data ItemIndent = ItemIndent { itemIndent :: !Int, descrIndent ::  !Int }
@@ -42,24 +43,112 @@ data IndentGuess = IndentGuess
   } deriving Show
 makeLenses ''IndentGuess
 
+--------------------------------------------------------------------------------
+-- * Parsing
+
 type Parser = ParsecT () Text (State IndentGuess)
 
-getColumn :: MonadParsec e s m => m Int
-getColumn = unPos . sourceColumn <$> getPosition
-
 runHelpParser :: Parser a -> Text -> (Either (ParseError Char ()) a, IndentGuess)
-runHelpParser p txt = runState (runParserT p "" txt) (IndentGuess (Nothing, Nothing) Nothing)
+runHelpParser p txt = runState (runParserT p "" txt) initState
+  where initState = IndentGuess (Nothing, Nothing) Nothing
 
 evalHelpParser :: Parser a -> Text -> Either (ParseError Char ()) a
 evalHelpParser a b = fst (runHelpParser a b)
 
-isNothingOrJustEq :: Eq a => Maybe a -> a -> Bool
-isNothingOrJustEq Nothing  _ = True
-isNothingOrJustEq (Just x) y = x == y
+getColumn :: MonadParsec e s m => m Int
+getColumn = unPos . sourceColumn <$> getPosition
+
+-- TODO: Actually pick out indices for flags and subcommands.
+parsePickAnchors :: HasCallStack => Text -> (Vector Item, UVector Int)
+parsePickAnchors txt =
+  evalHelpParser helpP txt
+  & (\case Right x -> x; Left y -> error (show y))
+  & chop groupConcatPlains
+  & V.fromList
+  & (, V.empty)
+  where
+    isPlain (Plain _) = True
+    isPlain _ = False
+    groupConcatPlains (Plain t : its) =
+      let (plains, rest) = span isPlain its in
+        (Plain (T.concat (t : map (\(Plain t') -> t') plains)), rest)
+    groupConcatPlains (x : xs) = (x, xs)
+    groupConcatPlains [] = (undefined, []) -- This case won't be called...
+
+helpP :: Parser [Item]
+helpP =
+  some (nl <|> try flagP <|> try subcommandP <|> plainP)
+  <* optional eof
+  where
+    nl = Plain . T.singleton <$> char '\n'
+
+----------------------------------------------------------------------
+-- ** Item parsers
+
+------------------------------------------------------------
+-- *** Plain text
+
+plainP :: Parser Item
+plainP = Plain . flip T.snoc '\n'
+  <$> (takeWhile1P Nothing (/= '\n') <* optional newline)
+
+------------------------------------------------------------
+-- *** Subcommands
+
+subcommandP :: Parser Item
+subcommandP =
+  twoColumn
+    Subcommand
+    subcommandTextP
+    ((:| []) . fmap itemIndent . view subcommandIndent)
+    subcommandIndent
+    (\itmCol descCol s -> case s ^. subcommandIndent of
+        Nothing -> modify (set subcommandIndent (Just (ItemIndent itmCol descCol)))
+        Just _  -> pure ()
+    )
+
+subcommandTextP :: Parser Text
+subcommandTextP =
+  lookAhead letterChar *> takeWhile1P Nothing (\c -> c == '-' || isAlphaNum c)
+
+------------------------------------------------------------
+-- *** Flags
+
+flagP :: Parser Item
+flagP =
+  twoColumn
+    Flags
+    flagTextP
+    (\s -> let (x, y) = s ^. flagIndent in fmap itemIndent x :| [y])
+    (flagIndent . _1)
+    (\itmCol descCol s -> case s ^. flagIndent of
+        (Nothing, Nothing) -> save _1 (Just (ItemIndent itmCol descCol))
+        (Just _,  Nothing) -> save _2 (Just itmCol)
+        (Just _,  Just _)  -> pure ()
+        (Nothing, Just _)  -> unreachableError
+    )
+   where save lx v = modify (set (flagIndent . lx) v)
+
+flagTextP :: Parser Text
+flagTextP = do
+  first <- gobble (char '-')
+  let next = try $ do
+        space1
+        gobble (satisfy (\c -> c == '[' || c == '<' || c == '-')
+                <|> (satisfy isUpper *> satisfy isUpper))
+  nextStuff <- many next
+  let flags = T.intercalate " " (first : nextStuff)
+  pure flags
+  where
+    gobble :: Parser a -> Parser Text
+    gobble lk = lookAhead lk *> takeWhile1P Nothing (/= ' ')
+
+------------------------------------------------------------
+-- *** Helper functions
 
 twoColumn
   :: (MonadParsec e Text m, MonadState IndentGuess m)
-  => (Text -> Text -> Item)                  -- ^ Constructor
+  => (Text -> Text -> Item)                  -- ^ Item constructor
   -> m Text                                  -- ^ Item parser
   -> (IndentGuess -> NonEmpty (Maybe Int))   -- ^ Item alignments
   -> L.Getter IndentGuess (Maybe ItemIndent) -- ^ Getter for description indent
@@ -101,65 +190,6 @@ descriptionP descCol descIndent = do
     descrLine =
       lookAhead (notChar '[') *> takeWhile1P Nothing (/= '\n') <* newline
 
-subcommandP :: Parser Item
-subcommandP =
-  twoColumn
-    Subcommand
-    subcommandItemP
-    ((:| []) . fmap itemIndent . view subcommandIndent)
-    subcommandIndent
-    (\itmCol descCol s -> case s ^. subcommandIndent of
-        Nothing -> modify (set subcommandIndent (Just (ItemIndent itmCol descCol)))
-        Just _  -> pure ()
-    )
-
-subcommandItemP :: Parser Text
-subcommandItemP =
-  lookAhead letterChar *> takeWhile1P Nothing (\c -> c == '-' || isAlphaNum c)
-
-flagP :: Parser Item
-flagP =
-  twoColumn
-    Flags
-    flagItemP
-    (\s -> let (x, y) = s ^. flagIndent in fmap itemIndent x :| [y])
-    (flagIndent . _1)
-    (\itmCol descCol s -> case s ^. flagIndent of
-        (Nothing, Nothing) -> save _1 (Just (ItemIndent itmCol descCol))
-        (Just _,  Nothing) -> save _2 (Just itmCol)
-        (Just _,  Just _)  -> pure ()
-        (Nothing, Just _)  -> unreachableError
-    )
-   where save lx v = modify (set (flagIndent . lx) v)
-
-flagItemP :: Parser Text
-flagItemP = do
-  first <- gobble (char '-')
-  let next = try $ do
-        space1
-        gobble (satisfy (\c -> c == '[' || c == '<' || c == '-')
-                <|> (satisfy isUpper *> satisfy isUpper))
-  nextStuff <- many next
-  let flags = T.intercalate " " (first : nextStuff)
-  pure flags
-  where
-    gobble :: Parser a -> Parser Text
-    gobble lk = lookAhead lk *> takeWhile1P Nothing (/= ' ')
-
-singleLineP :: Parser Item
-singleLineP = Plain . flip T.snoc '\n'
-  <$> (takeWhile1P Nothing (/= '\n') <* optional newline)
-
-helpP :: Parser [Item]
-helpP =
-  some (nl <|> try flagP <|> try subcommandP <|> singleLineP)
-  <* optional eof
-  where
-    nl = Plain . T.singleton <$> char '\n'
-
--- TODO: Actually pick out indices for flags and subcommands.
-parsePickAnchors :: HasCallStack => Text -> (Vector Item, UVector Int)
-parsePickAnchors t = (, V.empty)
-  $ V.fromList
-  $ (\case Right x -> x; Left y -> error (show y))
-  $ evalHelpParser helpP t
+isNothingOrJustEq :: Eq a => Maybe a -> a -> Bool
+isNothingOrJustEq Nothing  _ = True
+isNothingOrJustEq (Just x) y = x == y

@@ -71,6 +71,7 @@ library:
   - word-wrap >= 0.4 && < 0.5
   - zlib >= 0.6.2 && < 0.7
   - extra >= 1.6.0 && < 1.7
+  - split >= 0.2.3 && < 0.3
 
 executables:
   ozil:
