@@ -15,6 +15,7 @@ import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 
 import qualified Control.Lens as L
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import qualified Data.Vector.Generic as V
 
@@ -61,7 +62,7 @@ twoColumnAlt
   :: (MonadParsec e Text m, MonadState IndentGuess m)
   => (Text -> Text -> Item)                  -- ^ Constructor
   -> m Text                                  -- ^ Item parser
-  -> (IndentGuess -> [Int])                  -- ^ Item alignments
+  -> (IndentGuess -> NonEmpty (Maybe Int))   -- ^ Item alignments
   -> L.Getter IndentGuess (Maybe ItemIndent) -- ^ Getter for description indent
   -> (Int -> Int -> IndentGuess -> m ())     -- ^ Save state at the end.
   -> m Item
@@ -70,7 +71,7 @@ twoColumnAlt ctor itemP trv lx changeStateIfNeeded = do
   itmCol <- getColumn
   s <- get
   let itmIndents = trv s
-  guard (null itmIndents || itmCol `elem` itmIndents)
+  guard (any (\x -> isNothing x || x == Just itmCol) $ NE.toList itmIndents)
   itm <- itemP
   space1
   descCol <- getColumn
@@ -99,7 +100,7 @@ subcommandP =
   twoColumnAlt
     Subcommand
     subcommandItemP
-    (maybeToList . fmap itemIndent . view subcommandIndent)
+    ((:| []) . fmap itemIndent . view subcommandIndent)
     subcommandIndent
     (\itmCol descCol s -> case s ^. subcommandIndent of
         Nothing -> modify (set subcommandIndent (Just (ItemIndent itmCol descCol)))
@@ -115,10 +116,7 @@ flagP =
   twoColumnAlt
     Flags
     flagItemP
-    (\s -> case s ^. flagIndent of
-        (Nothing, _) -> []
-        (Just ii, x) -> itemIndent ii : maybeToList x
-    )
+    (\s -> let (x, y) = s ^. flagIndent in fmap itemIndent x :| [y])
     (flagIndent . _1)
     (\itmCol descCol s -> case s ^. flagIndent of
         (Nothing, Nothing) -> save _1 (Just (ItemIndent itmCol descCol))
