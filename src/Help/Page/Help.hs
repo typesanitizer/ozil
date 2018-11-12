@@ -2,7 +2,7 @@
 {-# LANGUAGE RankNTypes      #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Help.Page.Help where
+module Help.Page.Help (HelpPage (..), Item (..), parsePickAnchors) where
 
 import Commons
 
@@ -44,7 +44,6 @@ makeLenses ''IndentGuess
 
 type Parser = ParsecT () Text (State IndentGuess)
 
--- getColumn :: ParsecT () Text (State IndentGuess) Int
 getColumn :: MonadParsec e s m => m Int
 getColumn = unPos . sourceColumn <$> getPosition
 
@@ -54,11 +53,11 @@ runHelpParser p txt = runState (runParserT p "" txt) (IndentGuess (Nothing, Noth
 evalHelpParser :: Parser a -> Text -> Either (ParseError Char ()) a
 evalHelpParser a b = fst (runHelpParser a b)
 
-eqIfJust :: Eq a => Maybe a -> a -> Bool
-eqIfJust Nothing  _ = True
-eqIfJust (Just y) x = x == y
+isNothingOrJustEq :: Eq a => Maybe a -> a -> Bool
+isNothingOrJustEq Nothing  _ = True
+isNothingOrJustEq (Just x) y = x == y
 
-twoColumnAlt
+twoColumn
   :: (MonadParsec e Text m, MonadState IndentGuess m)
   => (Text -> Text -> Item)                  -- ^ Constructor
   -> m Text                                  -- ^ Item parser
@@ -66,23 +65,30 @@ twoColumnAlt
   -> L.Getter IndentGuess (Maybe ItemIndent) -- ^ Getter for description indent
   -> (Int -> Int -> IndentGuess -> m ())     -- ^ Save state at the end.
   -> m Item
-twoColumnAlt ctor itemP trv lx changeStateIfNeeded = do
+twoColumn ctor itemP itmIndentsIn lx saveIndents = do
+  -- First get the item
   space1
   itmCol <- getColumn
   s <- get
-  let itmIndents = trv s
-  guard (any (\x -> isNothing x || x == Just itmCol) $ NE.toList itmIndents)
+  let itmIndents = itmIndentsIn s
+  guard (any (`isNothingOrJustEq` itmCol) $ NE.toList itmIndents)
   itm <- itemP
+  -- Now get the description
   space1
   descCol <- getColumn
-  descr <- getDescrGeneralP (fmap descrIndent (s ^. lx))
-  changeStateIfNeeded itmCol descCol s
+  descr <- descriptionP descCol (fmap descrIndent (s ^. lx))
+  -- Save indentations (if applicable)
+  saveIndents itmCol descCol s
+  -- Done
   pure (ctor itm descr)
 
-getDescrGeneralP :: MonadParsec e Text m => Maybe Int -> m Text
-getDescrGeneralP descIndent = do
-  descCol <- getColumn
-  guard (eqIfJust descIndent descCol)
+descriptionP
+  :: MonadParsec e Text m
+  => Int       -- ^ Current column
+  -> Maybe Int -- ^ Indentation for description, if known.
+  -> m Text
+descriptionP descCol descIndent = do
+  guard (descIndent `isNothingOrJustEq` descCol)
   firstLine <- descrLine
   let nextLineP = try $ do
         space1
@@ -97,7 +103,7 @@ getDescrGeneralP descIndent = do
 
 subcommandP :: Parser Item
 subcommandP =
-  twoColumnAlt
+  twoColumn
     Subcommand
     subcommandItemP
     ((:| []) . fmap itemIndent . view subcommandIndent)
@@ -113,7 +119,7 @@ subcommandItemP =
 
 flagP :: Parser Item
 flagP =
-  twoColumnAlt
+  twoColumn
     Flags
     flagItemP
     (\s -> let (x, y) = s ^. flagIndent in fmap itemIndent x :| [y])
