@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 module Help.Page.Help
-  ( HelpPage (..), Item (..), ItemIndent (..), TableEntry (..), parsePickAnchors
+  ( HelpPage (..), Item (..), ItemIndent (..), TableEntry (..), parseHelpPage
   , TableType (..)
   ) where
 
@@ -72,26 +72,29 @@ evalHelpParser a b = fst (runHelpParser a b)
 getColumn :: MonadParsec e s m => m Int
 getColumn = unPos . sourceColumn <$> getPosition
 
--- TODO: Actually pick out indices for flags and subcommands.
-parsePickAnchors :: HasCallStack => Text -> (Vector Item, UVector Int, UVector (Int, Int))
-parsePickAnchors txt =
+-- TODO: We don't have Heading and synopsis parsing at the momemnt.
+-- Do we need it? Can we do without it?
+parseHelpPage :: HasCallStack => Text -> HelpPage
+parseHelpPage txt =
   evalHelpParser helpP txt
   & (\case Right x -> x; Left y -> error (show y))
   & chop groupConcat
   & V.fromList
-  & (\v -> (v,) $ V.fromList
-      [ i | i <- [0 .. V.length v - 1], isTabular Subcommand (v V.! i) ]
+  & (\v ->
+    let tixs = V.fromList
+          [ i | (i, x) <- zip [0 ..] (V.toList v), isTabular Subcommand x ]
+        ancs = V.unfoldr (go v tixs) (0, 0)
+    in HelpPage Nothing Nothing v ancs tixs
     )
-  & (\(v, tixs) -> (v, tixs, V.unfoldr (go v tixs) (0, 0)))
   where
-    go v u ixs@(i, j) =
+    go v u (i, j) =
       if i >= V.length u
       then Nothing
       else let u_i = u V.! i
                v_u_i = _entries (v V.! u_i)
            in if j >= V.length v_u_i
               then go v u (i + 1, 0)
-              else Just ((u_i, j), over _2 (+1) ixs)
+              else Just ((u_i, j), (i, j + 1))
     -- This function should really be called esPlain ;)
     isPlain (Plain _) = True
     isPlain _ = False
@@ -117,14 +120,14 @@ helpP =
 ------------------------------------------------------------
 -- *** Plain text
 
-plainP :: Parser Item
+plainP :: MonadParsec e Text m => m Item
 plainP = Plain . flip T.snoc '\n'
   <$> (takeWhile1P Nothing (/= '\n') <* optional newline)
 
 ------------------------------------------------------------
 -- *** Subcommands
 
-subcommandP :: Parser Item
+subcommandP :: (MonadParsec e Text m, MonadState IndentGuess m) => m Item
 subcommandP =
   twoColumn
     Subcommand
@@ -132,18 +135,19 @@ subcommandP =
     ((:| []) . fmap itemIndent . view subcommandIndent)
     subcommandIndent
     (\itmCol descCol s -> case s ^. subcommandIndent of
-        Nothing -> modify (set subcommandIndent (Just (ItemIndent itmCol descCol)))
         Just _  -> pure ()
+        Nothing ->
+          modify (set subcommandIndent (Just (ItemIndent itmCol descCol)))
     )
 
-subcommandTextP :: Parser Text
+subcommandTextP :: MonadParsec e Text m => m Text
 subcommandTextP =
   lookAhead letterChar *> takeWhile1P Nothing (\c -> c == '-' || isAlphaNum c)
 
 ------------------------------------------------------------
 -- *** Flags
 
-flagP :: Parser Item
+flagP :: (MonadParsec e Text m, MonadState IndentGuess m) => m Item
 flagP =
   twoColumn
     Flag
@@ -158,7 +162,7 @@ flagP =
     )
    where save lx v = modify (set (flagIndent . lx) v)
 
-flagTextP :: Parser Text
+flagTextP :: MonadParsec e Text m => m Text
 flagTextP = do
   first <- gobble (char '-')
   let next = try $ do
@@ -169,7 +173,7 @@ flagTextP = do
   let flags = T.intercalate " " (first : nextStuff)
   pure flags
   where
-    gobble :: Parser a -> Parser Text
+    gobble :: MonadParsec e Text m => m a -> m Text
     gobble lk = lookAhead lk *> takeWhile1P Nothing (/= ' ')
 
 ------------------------------------------------------------

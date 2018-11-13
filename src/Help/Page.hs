@@ -56,16 +56,8 @@ data DocPageSummary
   = ManSummary  !ManPageSummary
   | HelpSummary !HelpPageSummary
 
--- TODO: Improve this...
 parseLongHelp :: Text -> HelpPage
-parseLongHelp txt = HelpPage
-  { _helpPageHeading  = Nothing
-  , _helpPageSynopsis = Nothing
-  , _helpPageBody     = items
-  , _helpPageAnchors  = anchorIxs
-  , _helpPageTableIxs = tableIxs
-  }
-  where (items, tableIxs, anchorIxs) = parsePickAnchors txt
+parseLongHelp = parseHelpPage
 
 -- TODO: Improve this...
 parseShortHelp :: Text -> HelpPage
@@ -98,19 +90,22 @@ mapLinkState f = \case
 render :: LinkState -> DocPage -> Widget n
 render ls = \case
   Man m -> txtWrap (_manPageRest m)
-  LongHelp  HelpPage{_helpPageBody = x, _helpPageAnchors = a} -> ws x a
-  ShortHelp HelpPage{_helpPageBody = x, _helpPageAnchors = a} -> ws x a
+  LongHelp  HelpPage{_helpPageBody = v, _helpPageAnchors = a} -> widgets a v
+  ShortHelp HelpPage{_helpPageBody = v, _helpPageAnchors = a} -> widgets a v
   where
-    ws v a = vBox $ zipWith (renderItem a) [0 ..] (V.toList v)
+    widgets a = vBox . zipWith (renderItem a) [0 ..] . V.toList
     renderItem a i = \case
       Plain t -> txtWrap t
-      Tabular tt ents inds -> vBox . V.toList $ V.imap (\j -> renderEntry i j a tt inds) ents
-    defaultPadding = 4
+      Tabular tt ents inds -> vBox . V.toList
+        $ V.imap (\j -> renderEntry a i j tt inds) ents
+
+    defaultRightPadding = 4
     -- TODO: There is still an off-by-one error hiding somewhere. Try ozil ozil.
-    renderEntry i j a tblTy
+    -- We _could_ "fix" it by adding a (- 1) to the gap but is that right?
+    renderEntry a i j tblTy
       ItemIndent{itemIndent, descIndent}
       TableEntry{_name=item, _description=desc}
-      = padRight (Pad defaultPadding)
+      = padRight (Pad defaultRightPadding)
       $ padLeft (Pad itemIndent) (layout [itemWidget, descWidget])
       where
         layout = itemFits hBox (padTopBottom 1 . vBox)
@@ -126,7 +121,6 @@ render ls = \case
             $ if a V.! k == (i, j) then "subc-highlight" else "subc-link"
         delta_x = itemFits gap 4
         extraIndent = hLimit delta_x (vLimit 1 (fill ' '))
-    --
     -- TODO: improve line-breaking for flags because some programs have really
     -- long options. Here's one from rustc:
     -- --print [crate-name|file-names|sysroot|cfg|target-list|target-cpus|target-features|relocation-models|code-models|tls-models|target-spec-json|native-static-libs]
