@@ -95,7 +95,7 @@ mapLinkState f = \case
   LinksOn c i -> LinksOn c (inBounds 0 (f i) (c - 1))
 
 render :: LinkState -> DocPage -> Widget n
-render _ = \case
+render ls = \case
   Man m -> txtWrap (_manPageRest m)
   LongHelp  HelpPage{_helpPageBody = x} -> ws x
   ShortHelp HelpPage{_helpPageBody = x} -> ws x
@@ -113,7 +113,10 @@ render _ = \case
       -- The widget available in Brick doesn't understand that one can break in
       -- between at the |'s.
       let n = textWidth itm
-          iw = txtWrap itm
+          sel = case ls of
+            LinksOn{} -> withAttr "links-on"
+            LinksOff{} -> id
+          iw = sel (txtWrap itm)
           itemFits = ii + n < di
           delta_x = if itemFits then di - ii - n else 4
           extraIndent = hLimit delta_x (vLimit 1 (fill ' '))

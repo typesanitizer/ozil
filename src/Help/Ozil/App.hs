@@ -37,7 +37,8 @@ oapp = Brick.App
   , appChooseCursor = Brick.showFirstCursor
   , appHandleEvent = handleEvent
   , appStartEvent = ozilStartEvent
-  , appAttrMap = const $ Brick.attrMap Vty.defAttr []
+  , appAttrMap = const $ Brick.attrMap Vty.defAttr
+      [("links-on", Vty.withStyle Vty.defAttr Vty.standout)]
   }
 
 ozilStartEvent :: OState -> Brick.EventM OResource OState
