@@ -29,6 +29,9 @@ import Help.Page.Help
 
 import Brick hiding (txt, render)
 
+import Brick.Markup (markup, Markup)
+import Data.Monoid (Sum(..))
+import Data.Text.Markup (fromText)
 import Text.Wrap (WrapSettings (..))
 
 import qualified Brick
@@ -100,14 +103,17 @@ render ls = \case
 
 renderManPage :: ManPage -> Widget n
 renderManPage (ManPage (ManPageView h secs _) _) =
+  Brick.str (show $ getSum (foldMap (Sum . V.length . snd) secs))
+  ===
   vBox (renderHeading h : each renderSection secs)
   where
     renderHeading = const emptyWidget
     each f = V.toList . V.map f
     renderSection (sh, chnks) = vBox
-      (renderSectionHeading sh : each renderChunk chnks)
+      [renderSectionHeading sh, markup (mconcat (each renderChunk chnks))]
     renderSectionHeading = Brick.txt
-    renderChunk (Chunk txt _) = Brick.txt txt
+    renderChunk :: Chunk -> Markup AttrName
+    renderChunk (Chunk txt _) = fromText txt
 
 renderHelpPage :: LinkState -> HelpPage -> Widget n
 renderHelpPage ls HelpPage{_helpPageBody = v, _helpPageAnchors = a} =

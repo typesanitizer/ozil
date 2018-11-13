@@ -133,15 +133,29 @@ parseManPage t =
     isHeading = \case Heading _ -> True; _ -> False
     isSH = \case (Markup (Chunk  _ (Dir "SH"))) -> True; _ -> False
 
-    getChunks xs = [c | Markup c <- xs]
+    getTxt (Markup (Chunk z _)) = z
+    getTxt _ = error "unreachable"
+
+    getChunks = catMaybes . chop groupConcat
+    groupConcat [] = error "unreachable in chop"
+    groupConcat (chk : chks) = case chk of
+      Markup (Chunk txt d) ->
+        let (grp, rest) = span (\case Markup (Chunk _ d') -> d' == d; _ -> False) chks in
+          let txts = map getTxt grp in
+          (Just (Chunk (T.intercalate " " (txt : txts)) d), rest)
+      Comment _ -> (Nothing, chks)
+      Heading _ -> error "Heading should not have existed here."
+
     secs :: [ManPageLine] -> Vector (Text, Chunks)
     secs = V.fromList . catMaybes . chop
       (\(l:ls) -> case l of
           Markup (Chunk sh (Dir "SH")) ->
             let (chks, rest) = break isSH ls
             in (Just (sh, V.fromList (getChunks chks)), rest)
-          Markup (Chunk _ (Dir _)) -> error "This should've been gobbled by SH"
-          Markup (Chunk _ None) -> error "This should've been gobbled by SH"
+          Markup (Chunk _ (Dir _)) -> error "Dir s. s /= \"SH\". \
+                                            \This should've been gobbled by SH"
+          Markup (Chunk _ None) -> error "Dir = None. \
+                                         \This should've been gobbled by SH"
           Comment _ -> (Nothing, ls)
           Heading _ -> error "Heading should not have existed here."
       )
@@ -152,7 +166,7 @@ parseManPage t =
 type Parser = ParsecT () Text (State PS)
 
 data Directive = None | Dir !Text
-  deriving Show
+  deriving (Eq, Show)
 
 instance Semigroup Directive where
   None <> None = None
