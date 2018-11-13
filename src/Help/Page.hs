@@ -90,34 +90,36 @@ mapLinkState f = \case
   LinksOff c x -> LinksOff c x
   LinksOn c i -> LinksOn c (inBounds 0 (f i) (c - 1))
 
-renderManPage :: ManPage -> Widget n
-renderManPage (ManPage (ManPageView h secs _) _) =
-  vBox (renderHeading h : renderMany renderSection secs)
-  where
-    renderHeading = const emptyWidget
-    renderMany :: (a -> Widget n') -> Vector a -> [Widget n']
-    renderMany f = V.toList . V.map f
-    renderSection (sh, chnks) = vBox
-      (renderSectionHeading sh : renderMany renderChunk chnks)
-    renderSectionHeading = Brick.txt
-    renderChunk (Chunk txt _) = Brick.txt txt
-
 render :: LinkState -> DocPage -> Widget n
 render ls = \case
   Man m -> renderManPage m
-  LongHelp  HelpPage{_helpPageBody = v, _helpPageAnchors = a} -> widgets a v
-  ShortHelp HelpPage{_helpPageBody = v, _helpPageAnchors = a} -> widgets a v
+  LongHelp h -> renderHelpPage ls h
+  ShortHelp h -> renderHelpPage ls h
+
+renderManPage :: ManPage -> Widget n
+renderManPage (ManPage (ManPageView h secs _) _) =
+  vBox (renderHeading h : each renderSection secs)
   where
-    widgets a = vBox . zipWith (renderItem a) [0 ..] . V.toList
-    renderItem a i = \case
+    renderHeading = const emptyWidget
+    each f = V.toList . V.map f
+    renderSection (sh, chnks) = vBox
+      (renderSectionHeading sh : each renderChunk chnks)
+    renderSectionHeading = Brick.txt
+    renderChunk (Chunk txt _) = Brick.txt txt
+
+renderHelpPage :: LinkState -> HelpPage -> Widget n
+renderHelpPage ls HelpPage{_helpPageBody = v, _helpPageAnchors = a} =
+  vBox . zipWith renderItem [0 ..] $ V.toList v
+  where
+    renderItem i = \case
       Plain t -> txtWrap t
       Tabular tt ents inds -> vBox . V.toList
-        $ V.imap (\j -> renderEntry a i j tt inds) ents
+        $ V.imap (\j -> renderEntry i j tt inds) ents
 
     defaultRightPadding = 4
     -- TODO: There is still an off-by-one error hiding somewhere. Try ozil ozil.
     -- We _could_ "fix" it by adding a (- 1) to the gap but is that right?
-    renderEntry a i j tblTy
+    renderEntry i j tblTy
       ItemIndent{itemIndent, descIndent}
       TableEntry{_name=item, _description=desc}
       = padRight (Pad defaultRightPadding)
