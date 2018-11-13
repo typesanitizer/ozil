@@ -4,6 +4,7 @@
 
 module Help.Page.Help
   ( HelpPage (..), Item (..), ItemIndent (..), TableEntry (..), parsePickAnchors
+  , TableType (..)
   ) where
 
 import Commons
@@ -27,7 +28,9 @@ data HelpPage = HelpPage
   , _helpPageSynopsis :: Optional           -- ^ Equivalent to "usage"
   , _helpPageBody     :: Vector Item
   , _helpPageAnchors  :: UVector (Int, Int)
+    -- ^ Pair of coordinates to index into the body and _entries field.
   , _helpPageTableIxs :: UVector Int
+    -- ^ List of indices at which tables are stored in body.
   }
 
 data TableType = Flag | Subcommand
@@ -45,7 +48,7 @@ data Item
 data TableEntry = TableEntry { _name :: !Text, _description :: !Text }
   deriving Show
 
-data ItemIndent = ItemIndent { itemIndent :: !Int, descrIndent ::  !Int }
+data ItemIndent = ItemIndent { itemIndent :: !Int, descIndent ::  !Int }
   deriving Show
 
 data IndentGuess = IndentGuess
@@ -84,10 +87,11 @@ parsePickAnchors txt =
     go v u ixs@(i, j) =
       if i >= V.length u
       then Nothing
-      else let v_u_i = _entries (v V.! (u V.! i))
+      else let u_i = u V.! i
+               v_u_i = _entries (v V.! u_i)
            in if j >= V.length v_u_i
               then go v u (i + 1, 0)
-              else Just (ixs, over _2 (+1) ixs)
+              else Just ((u_i, j), over _2 (+1) ixs)
     -- This function should really be called esPlain ;)
     isPlain (Plain _) = True
     isPlain _ = False
@@ -190,11 +194,11 @@ twoColumn tt itemP itmIndentsIn lx saveIndents = do
   -- Now get the description
   space1
   descCol <- getColumn
-  descr <- descriptionP descCol (fmap descrIndent (s ^. lx))
+  desc <- descriptionP descCol (fmap descIndent (s ^. lx))
   -- Save indentations (if applicable)
   saveIndents itmCol descCol s
   -- Done
-  pure (Tabular tt (V.singleton (TableEntry itm descr)) (ItemIndent itmCol descCol))
+  pure (Tabular tt (pure (TableEntry itm desc)) (ItemIndent itmCol descCol))
 
 descriptionP
   :: MonadParsec e Text m

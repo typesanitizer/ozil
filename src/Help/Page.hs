@@ -1,8 +1,5 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 module Help.Page
   ( DocPage (..)
-  , helpPage
   , ManPageSummary (..)
   , parseManPageSummary
   , HelpPageSummary (..)
@@ -39,7 +36,6 @@ data DocPage
   = Man       { _docPageManPage  :: ManPage  }
   | LongHelp  { _docPageHelpPage :: HelpPage }
   | ShortHelp { _docPageHelpPage :: HelpPage }
-makeFields ''DocPage
 
 data ManPageSummary
   = WhatisDescr !WhatisDescription
@@ -86,8 +82,8 @@ data LinkState
 mkLinkStateOff :: DocPage -> LinkState
 mkLinkStateOff = \case
   Man{} -> LinksOff 0 0
-  LongHelp  HelpPage{_helpPageTableIxs = t} -> LinksOff (V.length t) 0
-  ShortHelp HelpPage{_helpPageTableIxs = t} -> LinksOff (V.length t) 0
+  LongHelp  HelpPage{_helpPageAnchors = t} -> LinksOff (V.length t) 0
+  ShortHelp HelpPage{_helpPageAnchors = t} -> LinksOff (V.length t) 0
 
 flipLinkState :: LinkState -> LinkState
 flipLinkState = \case
@@ -102,29 +98,36 @@ mapLinkState f = \case
 render :: LinkState -> DocPage -> Widget n
 render ls = \case
   Man m -> txtWrap (_manPageRest m)
-  LongHelp  HelpPage{_helpPageBody = x} -> ws x
-  ShortHelp HelpPage{_helpPageBody = x} -> ws x
+  LongHelp  HelpPage{_helpPageBody = x, _helpPageAnchors = a} -> ws x a
+  ShortHelp HelpPage{_helpPageBody = x, _helpPageAnchors = a} -> ws x a
   where
-    ws v = vBox $ map renderItem (V.toList v)
-    renderItem = \case
+    ws v a = vBox $ zipWith (renderItem a) [0 ..] (V.toList v)
+    renderItem a i = \case
       Plain t -> txtWrap t
-      Tabular _ ents inds -> vBox . V.toList $ V.map (renderEntry inds) ents
+      Tabular tt ents inds -> vBox . V.toList $ V.imap (\j -> renderEntry i j a tt inds) ents
     defaultPadding = 4
-    renderEntry (ItemIndent ii di) (TableEntry itm descr) =
-      -- TODO: improve line-breaking for flags because some programs have really
-      -- long options. Here's one from rustc:
-      -- --print [crate-name|file-names|sysroot|cfg|target-list|target-cpus|target-features|relocation-models|code-models|tls-models|target-spec-json|native-static-libs]
-      -- WTF mate.
-      -- The widget available in Brick doesn't understand that one can break in
-      -- between at the |'s.
-      let n = textWidth itm
-          sel = case ls of
-            LinksOn{} -> withAttr "links-on"
-            LinksOff{} -> id
-          iw = sel (txtWrap itm)
-          itemFits = ii + n < di
-          delta_x = if itemFits then di - ii - n else 4
-          extraIndent = hLimit delta_x (vLimit 1 (fill ' '))
-          dw = hBox [extraIndent, hLimit (if itemFits then 55 else 66) $ txtWrap descr]
-          lyt = if itemFits then hBox else padTopBottom 1 . vBox
-      in padLeftRight defaultPadding (lyt [iw, dw])
+    renderEntry i j a tblTy
+      ItemIndent{itemIndent, descIndent}
+      TableEntry{_name=item, _description=desc} =
+      padLeftRight defaultPadding (layout [itemWidget, descWidget])
+      where
+        layout = itemFits hBox (padTopBottom 1 . vBox)
+        itemWidget = highlight (txtWrap item)
+        descWidget = hBox [extraIndent, hLimit (itemFits 55 66) $ txtWrap desc]
+        gap = descIndent - itemWidth - itemIndent
+        itemFits tb fb = if gap > 0 then tb else fb
+        itemWidth = textWidth item
+        highlight = case ls of
+          LinksOff{} -> id
+          LinksOn{} | tblTy /= Subcommand  -> id
+          LinksOn _ k -> withAttr
+            $ if a V.! k == (i, j) then "subc-highlight" else "subc-link"
+        delta_x = itemFits gap 4
+        extraIndent = hLimit delta_x (vLimit 1 (fill ' '))
+    --
+    -- TODO: improve line-breaking for flags because some programs have really
+    -- long options. Here's one from rustc:
+    -- --print [crate-name|file-names|sysroot|cfg|target-list|target-cpus|target-features|relocation-models|code-models|tls-models|target-spec-json|native-static-libs]
+    -- WTF mate.
+    -- The widget available in Brick doesn't understand that one can break in
+    -- between at the |'s.

@@ -7,7 +7,7 @@ import Help.Ozil.App.Core
 
 import Help.Ozil.App.Config (FSEvent, toReactOrNotToReact)
 import Help.Ozil.App.Startup (finishStartup)
-import Help.Page.Lenses (anchors, tableIxs)
+import Help.Page.Lenses (anchors, tableIxs, helpPage)
 
 import qualified Help.Page as Page
 import qualified Help.Ozil.App.Default as Default
@@ -39,8 +39,11 @@ oapp = Brick.App
   , appHandleEvent = handleEvent
   , appStartEvent = ozilStartEvent
   , appAttrMap = const $ Brick.attrMap Vty.defAttr
-      [("links-on", Vty.withStyle Vty.defAttr Vty.standout)]
+      [ ("subc-link", subc_attr)
+      , ("subc-highlight", Vty.withStyle subc_attr Vty.standout)
+      ]
   }
+  where subc_attr = Vty.withStyle Vty.defAttr Vty.underline
 
 ozilStartEvent :: OState -> Brick.EventM OResource OState
 ozilStartEvent s = case s ^. watch of
@@ -117,9 +120,9 @@ viewerUI s =
     debugWidget =
       Brick.str (s ^. linkState & show)
       ===
-      Brick.strWrap (s ^? doc . Page.helpPage . anchors & show)
+      Brick.strWrap (s ^? doc . helpPage . anchors & show)
       ===
-      Brick.str (s ^? doc . Page.helpPage . tableIxs & show)
+      Brick.str (s ^? doc . helpPage . tableIxs & show)
     keyBindings = "Esc/q = Exit  k/↑ = Up  j/↓ = Down\
                   \  f = Follow  n = Next  p = Previous"
     header = T.snoc (T.cons ' ' (s ^. heading)) ' '
