@@ -45,9 +45,10 @@ parseLongHelp txt = HelpPage
   { _helpPageHeading  = Nothing
   , _helpPageSynopsis = Nothing
   , _helpPageBody     = items
-  , _helpPageAnchors  = anchors
+  , _helpPageAnchors  = anchorIxs
+  , _helpPageTableIxs = tableIxs
   }
-  where (items, anchors) = parsePickAnchors txt
+  where (items, tableIxs, anchorIxs) = parsePickAnchors txt
 
 -- TODO: Improve this...
 parseShortHelp :: Text -> HelpPage
@@ -56,11 +57,13 @@ parseShortHelp = parseLongHelp
 parseMan :: Text -> ManPage
 parseMan txt = emptyManPage { _manPageRest = txt }
 
-render :: DocPage -> Widget n
-render = \case
+data LinkState = LinksOff | LinksOn | LinkSelected !Int
+
+render :: LinkState -> DocPage -> Widget n
+render _ = \case
   Man m -> txtWrap (_manPageRest m)
-  LongHelp (HelpPage _ _ x _) -> ws x
-  ShortHelp (HelpPage _ _ x _) -> ws x
+  LongHelp  HelpPage{_helpPageBody = x} -> ws x
+  ShortHelp HelpPage{_helpPageBody = x} -> ws x
   where
     ws v = vBox $ map renderItem (V.toList v)
     renderItem = \case
@@ -68,6 +71,12 @@ render = \case
       Tabular _ ents inds -> vBox . V.toList $ V.map (renderEntry inds) ents
     defaultPadding = 4
     renderEntry (ItemIndent ii di) (TableEntry itm descr) =
+      -- TODO: improve line-breaking for flags because some programs have really
+      -- long options. Here's one from rustc:
+      -- --print [crate-name|file-names|sysroot|cfg|target-list|target-cpus|target-features|relocation-models|code-models|tls-models|target-spec-json|native-static-libs]
+      -- WTF mate.
+      -- The widget available in Brick doesn't understand that one can break in
+      -- between at the |'s.
       let n = textWidth itm
           iw = txtWrap itm
           itemFits = ii + n < di

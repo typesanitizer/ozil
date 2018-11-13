@@ -11,6 +11,7 @@ module Help.Ozil.App.Core
   , OState
   , HasDoc (..)
   , HasHeading (..)
+  , HasLinkState (..)
   , config
   , watch
   , getOptions
@@ -20,7 +21,7 @@ module Help.Ozil.App.Core
 
 import Commons
 
-import Help.Page (DocPage)
+import Help.Page (LinkState(LinksOff), DocPage)
 import Help.Ozil.App.Config.Watch (WatchManager, FSEvent)
 import Help.Ozil.App.Config.Types (Config)
 import Help.Ozil.App.Cmd (Options)
@@ -45,12 +46,13 @@ data OWatch
   | Running       !(IO ()) -- ^ Action to stop the watch
 
 data OState = OState
-  { oStateOptions  :: !Options
-  , _oStateConfig  :: !Config
-  , _oStateDoc     :: !DocPage
-  , _oStateWatch   :: !OWatch
-  , oStateChan     :: !(BChan OEvent)
-  , _oStateHeading :: !Text
+  { oStateOptions    :: !Options
+  , _oStateConfig    :: !Config
+  , _oStateDoc       :: !DocPage
+  , _oStateWatch     :: !OWatch
+  , oStateChan       :: !(BChan OEvent)
+  , _oStateHeading   :: !Text
+  , _oStateLinkState :: !LinkState
   }
 makeFields ''OState
 
@@ -68,10 +70,11 @@ newOState
   -> Config
   -> OState
 newOState opts wm ch dp cfg = OState
-  { oStateOptions  = opts
-  , _oStateConfig  = cfg
-  , _oStateDoc     = dp
-  , _oStateWatch   = Uninitialized wm
-  , oStateChan     = ch
-  , _oStateHeading = "binaryname"
+  { oStateOptions    = opts
+  , _oStateConfig    = cfg
+  , _oStateDoc       = dp
+  , _oStateWatch     = Uninitialized wm
+  , oStateChan       = ch
+  , _oStateHeading   = "binaryname"
+  , _oStateLinkState = LinksOff
   }

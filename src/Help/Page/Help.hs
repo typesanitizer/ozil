@@ -24,15 +24,15 @@ import qualified Data.Vector.Generic as V
 
 data HelpPage = HelpPage
   { _helpPageHeading  :: Optional
-  , _helpPageSynopsis :: Optional -- ^ Equivalent to "usage"
+  , _helpPageSynopsis :: Optional           -- ^ Equivalent to "usage"
   , _helpPageBody     :: Vector Item
-  , _helpPageAnchors  :: UVector Int
+  , _helpPageAnchors  :: UVector (Int, Int)
+  , _helpPageTableIxs :: UVector Int
   }
 
 data TableType = Flag | Subcommand
   deriving (Eq, Show)
 
--- TODO: Maybe we should record offsets here?
 data Item
   = Plain Text
   | Tabular
@@ -70,24 +70,34 @@ getColumn :: MonadParsec e s m => m Int
 getColumn = unPos . sourceColumn <$> getPosition
 
 -- TODO: Actually pick out indices for flags and subcommands.
-parsePickAnchors :: HasCallStack => Text -> (Vector Item, UVector Int)
+parsePickAnchors :: HasCallStack => Text -> (Vector Item, UVector Int, UVector (Int, Int))
 parsePickAnchors txt =
   evalHelpParser helpP txt
   & (\case Right x -> x; Left y -> error (show y))
   & chop groupConcat
   & V.fromList
-  & (, V.empty)
+  & (\v -> (v, V.fromList [i | i <- [0 .. V.length v - 1], isTabular (v V.! i)]))
+  & (\(v, tixs) -> (v, tixs, V.unfoldr (go v tixs) (0, 0)))
   where
+    go v p ixs@(p_i, v_p_i_j) =
+      if p_i >= V.length p
+      then Nothing
+      else let v_p_i = _entries (v V.! p_i)
+           in if v_p_i_j >= V.length v_p_i
+              then go v p (p_i + 1, 0)
+              else Just (ixs, over _2 (+1) ixs)
+    isTabular Tabular{} = True
+    isTabular _ = False
     -- This function should really be called esPlain ;)
     isPlain (Plain _) = True
     isPlain _ = False
-    isTabular tt (Tabular tt' _ _) = tt == tt'
-    isTabular _ _ = False
+    isTabular' tt (Tabular tt' _ _) = tt == tt'
+    isTabular' _ _ = False
     groupConcat [] = (undefined, []) -- This case won't be called...
     groupConcat (itm : itms) = case itm of
       Plain t -> let (plains, rest) = span isPlain itms in
         (Plain (T.concat (t : map (\(Plain t') -> t') plains)), rest)
-      Tabular tt tes _ -> let (tes', rest) = span (isTabular tt) itms in
+      Tabular tt tes _ -> let (tes', rest) = span (isTabular' tt) itms in
         (itm {_entries = V.concat (tes : map _entries tes')}, rest)
 
 helpP :: Parser [Item]

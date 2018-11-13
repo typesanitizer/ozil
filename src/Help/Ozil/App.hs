@@ -91,7 +91,10 @@ handleEvent s = \case
 -- +-----------------------+
 --
 -- ui :: (Show n, Ord n) => Brick.Widget n
-ui :: (HasDoc s Page.DocPage, HasHeading s Text) => s -> Brick.Widget OResource
+ui
+  :: (HasDoc s Page.DocPage, HasHeading s Text, HasLinkState s Page.LinkState)
+  => s
+  -> Brick.Widget OResource
 ui s = Border.borderWithLabel (Brick.txt header) $
   body
   Brick.<=>
@@ -100,7 +103,5 @@ ui s = Border.borderWithLabel (Brick.txt header) $
   Brick.txt "Esc/q = Exit  k/↑ = Up  j/↓ = Down"
   where
     header = T.snoc (T.cons ' ' (s ^. heading)) ' '
-    body = Page.render (s ^. doc)
+    body = Page.render (s ^. linkState) (s ^. doc)
       & Brick.viewport TextViewport Brick.Vertical
-      -- & Brick.txtWrap
-      -- & Brick.viewport TextViewport Brick.Vertical
