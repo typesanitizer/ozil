@@ -112,7 +112,7 @@ helpP =
   some (nl <|> try flagP <|> try subcommandP <|> plainP)
   <* optional eof
   where
-    nl = Plain . T.singleton <$> char '\n'
+    nl = Plain . T.singleton <$> newline
 
 ----------------------------------------------------------------------
 -- ** Item parsers

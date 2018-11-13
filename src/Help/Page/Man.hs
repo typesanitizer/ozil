@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies    #-}
 
 module Help.Page.Man
   ( WhatisDescription (..)
@@ -8,7 +8,9 @@ module Help.Page.Man
   , emptyManPage
   , ManPageView (..)
   , ManPageMetadata (..)
+  , Chunk (Chunk)
   , parseManPage
+  , manHeadingP
   ) where
 
 import Commons
@@ -18,8 +20,11 @@ import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 
 import Data.Char (isAlphaNum)
+import Data.Either (fromRight)
 import Data.HashSet (HashSet)
+import Data.List.Split (chop)
 
+import qualified Control.Lens as L
 import qualified Data.Text as T
 import qualified Data.HashSet as Set
 import qualified Data.Vector.Generic as V
@@ -54,19 +59,19 @@ data Heading = ManHeading
   , _headingDate    :: !Text
   , _headingSource  :: !Text
   , _headingManual  :: !Text
-  }
+  } deriving Show
 
 emptyHeading :: Heading
 emptyHeading = ManHeading "" "" "" "" ""
 
-manHeadingP :: Parser Heading
+manHeadingP :: MonadParsec e Text m => m Heading
 manHeadingP = do
-  directive "TH"
   _headingTitle <- lexeme binNameP
   _headingSection <- lexeme secNumP
   _headingDate <- lexeme quoted
   _headingSource <- lexeme quoted
-  _headingManual <- lexeme quoted
+  _headingManual <- quoted
+  void (space *> optional eof)
   pure $ ManHeading
     { _headingTitle
     , _headingSection
@@ -79,17 +84,17 @@ manHeadingP = do
 --------------------------------------------------------------------------------
 -- * Man page
 
--- | Structure of a typical man-page
+-- | Structure of a typical man-page.
 -- See man-pages(7).
 data ManPage = ManPage
-  { _manPageView :: !ManPageView
+  { _manPageView     :: !ManPageView
   , _manPageMetadata :: !ManPageMetadata
   }
 
 data ManPageView = ManPageView
-  { _manPageViewHeading      :: !Heading
-  , _manPageViewSection      :: !(Vector (Text, Text))
-  , _manPageViewRest         :: !Text
+  { _manPageViewHeading :: !Heading
+  , _manPageViewSection :: !(Vector (Text, Chunks))
+  , _manPageViewRest    :: !Text
   }
 
 data ManPageMetadata = ManPageMetadata
@@ -100,22 +105,46 @@ data ManPageMetadata = ManPageMetadata
 emptyManPage :: ManPage
 emptyManPage = ManPage (ManPageView emptyHeading mempty "") (ManPageMetadata mempty mempty)
 
-parseManPage :: Text -> ManPage
-parseManPage t = ManPage (ManPageView emptyHeading mempty t) (ManPageMetadata mempty mempty)
-  -- let inp = T.lines tin
-  --     (res, ps) = runManParser manPageP inp
-  -- in ManPage (fromRight (error "man page parse failure!") res)
-  --     ManPageMetadata  (V.fromList inp) (V.reverse (V.fromList $ unrecognized ps))
-
-
 -- Ossanna and Kernighan's "Troff User's manual" seems to at least have the
 -- comment syntax "correct" (it matches up with man.1). I guess I will just have
 -- to fumble my way through this.
 --
 -- Any new insights should probably be documented on Unix.SE:
 -- https://unix.stackexchange.com/q/481025/89474
-manPageP :: Parser ManPageView
-manPageP = undefined
+parseManPage :: Text -> ManPage
+parseManPage t =
+  ManPage
+  (ManPageView h (secs rets') t)
+  (ManPageMetadata (V.fromList inp) (V.reverse $ V.fromList ps))
+  where
+    inp = T.lines t
+    (rets, PS ps) =
+      flip runState (PS [])
+      $ L.itraverse (\i line -> runParserT (manPageLineP i) "" line) inp
+    errmsg i v = printf "man page line %d parse error " i ++ show v
+    -- TODO: Too many partial functions and incomplete matches here :(
+    (tmp', tmp) = break isHeading
+      $ zipWith (\i v -> fromRight (error (errmsg i v)) v) [1 :: Int ..] rets
+
+    (Heading h, rets') = case tmp of
+      (Heading h' : rest) -> (Heading h', rest)
+      _ -> error (show (take 20 tmp') ++ "\n" ++ show (take 10 tmp))
+
+    isHeading = \case Heading _ -> True; _ -> False
+    isSH = \case (Markup (Chunk  _ (Dir "SH"))) -> True; _ -> False
+
+    getChunks xs = [c | Markup c <- xs]
+    secs :: [ManPageLine] -> Vector (Text, Chunks)
+    secs = V.fromList . catMaybes . chop
+      (\(l:ls) -> case l of
+          Markup (Chunk sh (Dir "SH")) ->
+            let (chks, rest) = break isSH ls
+            in (Just (sh, V.fromList (getChunks chks)), rest)
+          Markup (Chunk _ (Dir _)) -> error "This should've been gobbled by SH"
+          Markup (Chunk _ None) -> error "This should've been gobbled by SH"
+          Comment _ -> (Nothing, ls)
+          Heading _ -> error "Heading should not have existed here."
+      )
 
 --------------------------------------------------------------------------------
 -- * Helper functions
@@ -123,6 +152,7 @@ manPageP = undefined
 type Parser = ParsecT () Text (State PS)
 
 data Directive = None | Dir !Text
+  deriving Show
 
 instance Semigroup Directive where
   None <> None = None
@@ -136,36 +166,43 @@ instance Monoid Directive where
 knownDirectives :: HashSet Text
 knownDirectives = Set.fromList ["SH", "B", "RB", "RI", "IR", "I", "br"]
 
-manPageLineP :: Parser ManPageLine
-manPageLineP =
-  startsWithDotP <|>
-  (Markup <$> takeWhile1P' (/= '\n') <*> pure None)
+newtype PS = PS {unrecognized :: [Int]}
+
+manPageLineP :: Int -> Parser ManPageLine
+manPageLineP i =
+  (eof *> pure (Markup (Chunk "" None)))
+  <|> startsWithDotP
+  <|> wthP
   where
+    wthP = fmap Markup . Chunk <$> takeWhile1P' (/= '\n') <*> pure None
+    fullLine = takeWhileP Nothing (const True)
+    commentP = Comment <$> try (string "\\\"" *> fullLine)
     startsWithDotP =
-      (Comment <$> try (string "\\\"" *> takeWhile1P' (/= '\n')))
-      <|> (Heading <$> try (string "TH" *> manHeadingP))
-      <|> do
-        dir <- takeWhile1P' (/= ' ')
-        let recog = dir `Set.member` knownDirectives
-        undefined
+          try (char '\'' *> commentP)
+      <|> (char '.' *>
+           (    commentP
+            <|> (Heading <$> try (lexeme (string "TH") *> manHeadingP))
+            <|> do
+               dir <- takeWhile1P' (/= ' ')
+               txt <- fullLine
+               let recognized = dir `Set.member` knownDirectives
+               unless recognized
+                 $ modify (\ps -> ps{unrecognized = i : unrecognized ps})
+               pure (Markup (Chunk txt (Dir dir)))
+            <|> wthP
+            )
+          )
+
+data Chunk = Chunk !Text !Directive
+  deriving Show
+
+type Chunks = Vector Chunk
 
 data ManPageLine
-  = Markup  !Text !Directive
+  = Markup  !Chunk
   | Comment !Text
   | Heading !Heading
-
-runManParser = undefined
--- runManParser :: Parser a -> Text -> (Either (ParseError Char ()) a, PS)
--- runManParser p txt = runState (undefined p "" txt) initState
---   where initState = PS [] ""
-
-data PS = PS
-  { unrecognized     :: [Int]
-  , currentDirective :: Directive
-  }
-
-directive :: MonadParsec e Text m => Text -> m ()
-directive t = char '.' >> string t >> space1
+  deriving Show
 
 lexeme :: (MonadParsec e s f, Token s ~ Char) => f a -> f a
 lexeme x = x <* space1
@@ -178,6 +215,3 @@ binNameP = takeWhile1P' isAlphaNumOrDash
 
 secNumP :: (MonadParsec e s m, Token s ~ Char) => m (Tokens s)
 secNumP = takeWhile1P' isAlphaNumOrDash
-
-manSectionP :: Text -> Parser Text
-manSectionP = undefined

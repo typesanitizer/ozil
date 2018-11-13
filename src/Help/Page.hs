@@ -22,13 +22,14 @@ module Help.Page
 import Commons
 
 import Help.Page.Man
-  ( parseManPage, emptyManPage, ManPage (..), ManPageView (_manPageViewRest)
-  , WhatisDescription (..), parseWhatisDescription
+  ( parseManPage, emptyManPage, ManPage (..), ManPageView (..)
+  , WhatisDescription (..), parseWhatisDescription, Chunk (..)
   )
 import Help.Page.Help
 
 import Brick hiding (txt, render)
 
+import qualified Brick
 import qualified Data.Vector.Generic as V
 
 --------------------------------------------------------------------------------
@@ -89,9 +90,21 @@ mapLinkState f = \case
   LinksOff c x -> LinksOff c x
   LinksOn c i -> LinksOn c (inBounds 0 (f i) (c - 1))
 
+renderManPage :: ManPage -> Widget n
+renderManPage (ManPage (ManPageView h secs _) _) =
+  vBox (renderHeading h : renderMany renderSection secs)
+  where
+    renderHeading = const emptyWidget
+    renderMany :: (a -> Widget n') -> Vector a -> [Widget n']
+    renderMany f = V.toList . V.map f
+    renderSection (sh, chnks) = vBox
+      (renderSectionHeading sh : renderMany renderChunk chnks)
+    renderSectionHeading = Brick.txt
+    renderChunk (Chunk txt _) = Brick.txt txt
+
 render :: LinkState -> DocPage -> Widget n
 render ls = \case
-  Man m -> txtWrap (_manPageViewRest $ _manPageView m)
+  Man m -> renderManPage m
   LongHelp  HelpPage{_helpPageBody = v, _helpPageAnchors = a} -> widgets a v
   ShortHelp HelpPage{_helpPageBody = v, _helpPageAnchors = a} -> widgets a v
   where
