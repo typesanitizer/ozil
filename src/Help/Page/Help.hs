@@ -76,28 +76,28 @@ parsePickAnchors txt =
   & (\case Right x -> x; Left y -> error (show y))
   & chop groupConcat
   & V.fromList
-  & (\v -> (v, V.fromList [i | i <- [0 .. V.length v - 1], isTabular (v V.! i)]))
+  & (\v -> (v,) $ V.fromList
+      [ i | i <- [0 .. V.length v - 1], isTabular Subcommand (v V.! i) ]
+    )
   & (\(v, tixs) -> (v, tixs, V.unfoldr (go v tixs) (0, 0)))
   where
-    go v p ixs@(p_i, v_p_i_j) =
-      if p_i >= V.length p
+    go v u ixs@(i, j) =
+      if i >= V.length u
       then Nothing
-      else let v_p_i = _entries (v V.! p_i)
-           in if v_p_i_j >= V.length v_p_i
-              then go v p (p_i + 1, 0)
+      else let v_u_i = _entries (v V.! (u V.! i))
+           in if j >= V.length v_u_i
+              then go v u (i + 1, 0)
               else Just (ixs, over _2 (+1) ixs)
-    isTabular Tabular{} = True
-    isTabular _ = False
     -- This function should really be called esPlain ;)
     isPlain (Plain _) = True
     isPlain _ = False
-    isTabular' tt (Tabular tt' _ _) = tt == tt'
-    isTabular' _ _ = False
+    isTabular tt (Tabular tt' _ _) = tt == tt'
+    isTabular _ _ = False
     groupConcat [] = (undefined, []) -- This case won't be called...
     groupConcat (itm : itms) = case itm of
       Plain t -> let (plains, rest) = span isPlain itms in
         (Plain (T.concat (t : map (\(Plain t') -> t') plains)), rest)
-      Tabular tt tes _ -> let (tes', rest) = span (isTabular' tt) itms in
+      Tabular tt tes _ -> let (tes', rest) = span (isTabular tt) itms in
         (itm {_entries = V.concat (tes : map _entries tes')}, rest)
 
 helpP :: Parser [Item]

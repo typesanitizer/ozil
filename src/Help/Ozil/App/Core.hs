@@ -12,6 +12,7 @@ module Help.Ozil.App.Core
   , HasDoc (..)
   , HasHeading (..)
   , HasLinkState (..)
+  , HasDebugMode (..)
   , config
   , watch
   , getOptions
@@ -24,7 +25,7 @@ import Commons
 import Help.Page (LinkState, mkLinkStateOff, DocPage)
 import Help.Ozil.App.Config.Watch (WatchManager, FSEvent)
 import Help.Ozil.App.Config.Types (Config)
-import Help.Ozil.App.Cmd (Options)
+import Help.Ozil.App.Cmd (optCommand, Options, HasDebugMode(..), _Default)
 
 import Brick (App (..))
 import Brick.BChan (BChan)
@@ -53,6 +54,7 @@ data OState = OState
   , oStateChan       :: !(BChan OEvent)
   , _oStateHeading   :: !Text
   , _oStateLinkState :: !LinkState
+  , _oStateDebugMode :: !Bool
   }
 makeFields ''OState
 
@@ -77,4 +79,5 @@ newOState opts wm ch dp cfg = OState
   , oStateChan       = ch
   , _oStateHeading   = "binaryname"
   , _oStateLinkState = mkLinkStateOff dp
+  , _oStateDebugMode = fromMaybe False (opts ^? optCommand._Default.debugMode)
   }

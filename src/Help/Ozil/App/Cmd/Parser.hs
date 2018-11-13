@@ -86,11 +86,15 @@ defaultOptionsP =
           )
     <*> ( toInputFile <$> strArgument
           (  metavar "<file>"
-            <> help
-            "Input: can be a binary name (e.g. gcc), or a man page \
-            \(e.g. gcc.1 or gcc.1.gz) or a path (e.g. foo/a.out)."
+          <> help
+             "Input: can be a binary name (e.g. gcc), or a man page \
+             \(e.g. gcc.1 or gcc.1.gz) or a path (e.g. foo/a.out)."
           )
         )
+    <*> switch
+          (  long "debug"
+          <> help "Run ozil in debug mode."
+          )
  where
   offSwitch = fmap not . switch
   toInputFile s =

@@ -5,8 +5,10 @@ module Help.Ozil.App.Cmd.Types
   ( module Help.Ozil.App.Cmd.Types
   ) where
 
-import Control.Lens (Iso', iso)
-import Control.Lens.TH (makeFields, makePrisms)
+import Commons
+
+import Control.Lens (Getter, Iso', iso)
+import Control.Lens.TH (makePrisms)
 
 data ConfigOptions
   = ConfigInit   -- ^ Initialize a config file.
@@ -54,8 +56,9 @@ data InputFile
   deriving Show
 
 data DefaultOptions = DefaultOptions
-  { _defaultOptionsAutofind :: !Bool
-  , _defaultOptionsInputs   :: !InputFile
+  { _defaultOptionsAutofind  :: !Bool
+  , _defaultOptionsInputs    :: !InputFile
+  , _defaultOptionsDebugMode :: !Bool
   } deriving Show
 
 data Query = QueryDefault | QueryFull

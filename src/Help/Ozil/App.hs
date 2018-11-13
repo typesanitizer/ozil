@@ -7,6 +7,7 @@ import Help.Ozil.App.Core
 
 import Help.Ozil.App.Config (FSEvent, toReactOrNotToReact)
 import Help.Ozil.App.Startup (finishStartup)
+import Help.Page.Lenses (anchors, tableIxs)
 
 import qualified Help.Page as Page
 import qualified Help.Ozil.App.Default as Default
@@ -33,7 +34,7 @@ main = defaultMain $ \opts -> do
 
 oapp :: OApp
 oapp = Brick.App
-  { appDraw = \s -> [ui s]
+  { appDraw = viewerUI
   , appChooseCursor = Brick.showFirstCursor
   , appHandleEvent = handleEvent
   , appStartEvent = ozilStartEvent
@@ -97,19 +98,30 @@ handleEvent s = \case
 -- +-----------------------+
 --
 -- ui :: (Show n, Ord n) => Brick.Widget n
-ui
-  :: (HasDoc s Page.DocPage, HasHeading s Text, HasLinkState s Page.LinkState)
+viewerUI
+  :: ( HasDoc s Page.DocPage
+     , HasHeading s Text
+     , HasLinkState s Page.LinkState
+     , HasDebugMode s Bool)
   => s
-  -> Brick.Widget OResource
-ui s = Border.borderWithLabel (Brick.txt header) $
-  Brick.str (s ^. linkState & show)
-  Brick.<=>
-  body
-  Brick.<=>
-  Border.hBorder
-  Brick.<=>
-  Brick.txt "Esc/q = Exit  k/↑ = Up  j/↓ = Down"
+  -> [Brick.Widget OResource]
+viewerUI s =
+  (\x -> if s ^. debugMode then [Brick.vBox [debugWidget, x]] else [x])
+  $ Border.borderWithLabel (Brick.txt header)
+    $ mainstuff
+      ===
+      Border.hBorder
+      ===
+      Brick.txtWrap keyBindings
   where
+    debugWidget =
+      Brick.str (s ^. linkState & show)
+      ===
+      Brick.strWrap (s ^? doc . Page.helpPage . anchors & show)
+      ===
+      Brick.str (s ^? doc . Page.helpPage . tableIxs & show)
+    keyBindings = "Esc/q = Exit  k/↑ = Up  j/↓ = Down\
+                  \  f = Follow  n = Next  p = Previous"
     header = T.snoc (T.cons ' ' (s ^. heading)) ' '
-    body = Page.render (s ^. linkState) (s ^. doc)
+    mainstuff = Page.render (s ^. linkState) (s ^. doc)
       & Brick.viewport TextViewport Brick.Vertical

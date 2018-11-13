@@ -19,6 +19,8 @@ module Commons
   , inBounds
   , pattern KeyPress
   , Optional
+  , (===)
+  , (|||)
   )
   where
 
@@ -63,3 +65,9 @@ pattern KeyPress :: Vty.Key -> Brick.BrickEvent n e
 pattern KeyPress k = Brick.VtyEvent (Vty.EvKey k [])
 
 type Optional = Maybe Text
+
+(===) :: Brick.Widget n -> Brick.Widget n -> Brick.Widget n
+(===) = (Brick.<=>)
+
+(|||) :: Brick.Widget n -> Brick.Widget n -> Brick.Widget n
+(|||) = (Brick.<+>)

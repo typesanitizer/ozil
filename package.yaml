@@ -42,6 +42,7 @@ default-extensions:
 - FlexibleInstances
 - FlexibleContexts
 - MultiParamTypeClasses
+- FunctionalDependencies
 - BangPatterns
 - LambdaCase
 - NamedFieldPuns

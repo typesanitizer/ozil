@@ -1,5 +1,8 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 module Help.Page
   ( DocPage (..)
+  , helpPage
   , ManPageSummary (..)
   , parseManPageSummary
   , HelpPageSummary (..)
@@ -33,9 +36,10 @@ import qualified Data.Vector.Generic as V
 -- * Pages
 
 data DocPage
-  = Man { _manPage :: ManPage }
-  | LongHelp { _longHelpPage :: HelpPage }
-  | ShortHelp { _shortHelpPage :: HelpPage }
+  = Man       { _docPageManPage  :: ManPage  }
+  | LongHelp  { _docPageHelpPage :: HelpPage }
+  | ShortHelp { _docPageHelpPage :: HelpPage }
+makeFields ''DocPage
 
 data ManPageSummary
   = WhatisDescr !WhatisDescription
@@ -45,6 +49,7 @@ parseManPageSummary :: String -> ManPageSummary
 parseManPageSummary s =
   maybe (UnknownFormat s) WhatisDescr (parseWhatisDescription s)
 
+-- FIXME: Erm, these record field names don't make sense. Available and Text?
 data HelpPageSummary = HelpPageSummary
   { binaryPath         :: FilePath
   , shortHelpAvailable :: !Bool
