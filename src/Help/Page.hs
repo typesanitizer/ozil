@@ -29,6 +29,8 @@ import Help.Page.Help
 
 import Brick hiding (txt, render)
 
+import Text.Wrap (WrapSettings (..))
+
 import qualified Brick
 import qualified Data.Vector.Generic as V
 
@@ -125,8 +127,9 @@ renderHelpPage ls HelpPage{_helpPageBody = v, _helpPageAnchors = a} =
       = padRight (Pad defaultRightPadding)
       $ padLeft (Pad itemIndent) (layout [itemWidget, descWidget])
       where
+        ws = WrapSettings{preserveIndentation=False, breakLongWords=True}
         layout = itemFits hBox (padTopBottom 1 . vBox)
-        itemWidget = highlight (txtWrap item)
+        itemWidget = highlight (txtWrapWith ws item)
         descWidget = hBox [extraIndent, hLimit (itemFits 55 66) $ txtWrap desc]
         gap = descIndent - itemWidth - itemIndent
         itemFits tb fb = if gap > 0 then tb else fb
@@ -138,9 +141,3 @@ renderHelpPage ls HelpPage{_helpPageBody = v, _helpPageAnchors = a} =
             $ if a V.! k == (i, j) then "subc-highlight" else "subc-link"
         delta_x = itemFits gap 4
         extraIndent = hLimit delta_x (vLimit 1 (fill ' '))
-    -- TODO: improve line-breaking for flags because some programs have really
-    -- long options. Here's one from rustc:
-    -- --print [crate-name|file-names|sysroot|cfg|target-list|target-cpus|target-features|relocation-models|code-models|tls-models|target-spec-json|native-static-libs]
-    -- WTF mate.
-    -- The widget available in Brick doesn't understand that one can break in
-    -- between at the |'s.
