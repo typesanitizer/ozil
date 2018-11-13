@@ -68,7 +68,12 @@ handleEvent s = \case
         _ -> 0
     when (scrollAmt /= 0)
       $ Brick.vScrollBy (Brick.viewportScroll TextViewport) scrollAmt
-    Brick.continue s
+    let chLS = case ev of
+          KeyPress (Vty.KChar 'f') -> Page.flipLinkState
+          KeyPress (Vty.KChar 'n') -> Page.mapLinkState (+1)
+          KeyPress (Vty.KChar 'p') -> Page.mapLinkState (subtract 1)
+          _ -> id
+    Brick.continue (over linkState chLS s)
   where
     stopProgram = do
       case s ^. watch of
@@ -96,6 +101,8 @@ ui
   => s
   -> Brick.Widget OResource
 ui s = Border.borderWithLabel (Brick.txt header) $
+  Brick.str (s ^. linkState & show)
+  Brick.<=>
   body
   Brick.<=>
   Border.hBorder

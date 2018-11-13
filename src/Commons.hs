@@ -16,6 +16,7 @@ module Commons
   , module Text.Printf
   , readProcessSimple
   , headMaybe
+  , inBounds
   , pattern KeyPress
   , Optional
   )
@@ -54,6 +55,9 @@ readProcessSimple p s = do
 
 headMaybe :: [a] -> Maybe a
 headMaybe = listToMaybe
+
+inBounds :: Ord a => a -> a -> a -> a
+inBounds mn v mx = max mn (min v mx)
 
 pattern KeyPress :: Vty.Key -> Brick.BrickEvent n e
 pattern KeyPress k = Brick.VtyEvent (Vty.EvKey k [])

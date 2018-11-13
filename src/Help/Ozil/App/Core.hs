@@ -21,7 +21,7 @@ module Help.Ozil.App.Core
 
 import Commons
 
-import Help.Page (LinkState(LinksOff), DocPage)
+import Help.Page (LinkState, mkLinkStateOff, DocPage)
 import Help.Ozil.App.Config.Watch (WatchManager, FSEvent)
 import Help.Ozil.App.Config.Types (Config)
 import Help.Ozil.App.Cmd (Options)
@@ -76,5 +76,5 @@ newOState opts wm ch dp cfg = OState
   , _oStateWatch     = Uninitialized wm
   , oStateChan       = ch
   , _oStateHeading   = "binaryname"
-  , _oStateLinkState = LinksOff
+  , _oStateLinkState = mkLinkStateOff dp
   }

@@ -1,4 +1,23 @@
-module Help.Page where
+module Help.Page
+  ( DocPage (..)
+  , ManPageSummary (..)
+  , parseManPageSummary
+  , HelpPageSummary (..)
+
+  , parseShortHelp
+  , parseLongHelp
+  , parseMan
+
+  , DocPageSummary (..)
+
+  , LinkState
+  , mkLinkStateOff
+  , flipLinkState
+  , mapLinkState
+
+  , render
+  )
+  where
 
 import Commons
 
@@ -6,11 +25,8 @@ import Help.Page.Man
   ( emptyManPage, ManPage (..), WhatisDescription (..), parseWhatisDescription )
 import Help.Page.Help
 
-import Brick hiding (txt)
-import Brick.Widgets.Border (border)
+import Brick hiding (txt, render)
 
-import qualified Brick
-import qualified Data.Text as T
 import qualified Data.Vector.Generic as V
 
 --------------------------------------------------------------------------------
@@ -57,7 +73,26 @@ parseShortHelp = parseLongHelp
 parseMan :: Text -> ManPage
 parseMan txt = emptyManPage { _manPageRest = txt }
 
-data LinkState = LinksOff | LinksOn | LinkSelected !Int
+data LinkState
+  = LinksOff {len :: !Int, _prev :: !Int}
+  | LinksOn  {len :: !Int, _sel  :: !Int}
+  deriving Show
+
+mkLinkStateOff :: DocPage -> LinkState
+mkLinkStateOff = \case
+  Man{} -> LinksOff 0 0
+  LongHelp  HelpPage{_helpPageTableIxs = t} -> LinksOff (V.length t) 0
+  ShortHelp HelpPage{_helpPageTableIxs = t} -> LinksOff (V.length t) 0
+
+flipLinkState :: LinkState -> LinkState
+flipLinkState = \case
+  LinksOff c x -> LinksOn c x
+  LinksOn c x -> LinksOff c x
+
+mapLinkState :: (Int -> Int) -> LinkState -> LinkState
+mapLinkState f = \case
+  LinksOff c x -> LinksOff c x
+  LinksOn c i -> LinksOn c (inBounds 0 (f i) (c - 1))
 
 render :: LinkState -> DocPage -> Widget n
 render _ = \case
