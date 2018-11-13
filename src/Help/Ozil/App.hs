@@ -25,11 +25,11 @@ main = defaultMain $ \opts -> do
   (dp, cfg) <- finishStartup opts
   FSNotify.withManager $ \wm -> do
     chan <- BChan.newBChan maxChanSize
-    saveState $ Brick.customMain gui (Just chan) oapp (newOState opts wm chan dp cfg)
+    saveConfig $ Brick.customMain gui (Just chan) oapp (newOState opts wm chan dp cfg)
   where
     gui = Vty.mkVty Vty.defaultConfig
     maxChanSize = 20
-    saveState = void
+    saveConfig = void
 
 oapp :: OApp
 oapp = Brick.App
@@ -40,30 +40,13 @@ oapp = Brick.App
   , appAttrMap = const $ Brick.attrMap Vty.defAttr []
   }
 
--- runOzil :: Options -> IO (FSNotify.WatchManager -> IO ())
--- runOzil opts = pure $ \wm ->
---   join . FSNotify.watchDir wm Default.configDir toReactOrNotToReact $ \event ->
---     evalStartup opts Default.config
---       $   getConfig
---       >>  selectPages
---       >>= viewPages event
---       >>  saveConfig
-
--- viewPages :: FSNotify.Event -> [DocPage] -> Startup ()
--- viewPages = unimplementedError
--- viewPage :: Options -> DocPage -> IO ()
--- viewPage = undefined
-
 ozilStartEvent :: OState -> Brick.EventM OResource OState
 ozilStartEvent s = case s ^. watch of
   Running _ -> pure s
   Uninitialized wm -> do
-    --   ((dp, _), config') <- finishStartup (getOptions s)
     sw <- liftIO $
       FSNotify.watchDir wm Default.configDir toReactOrNotToReact forwardEvent
     pure (set watch (Running sw) s)
-      -- & set text (Page.render dp)
-      -- & set config config'
   where
     forwardEvent :: FSEvent -> IO ()
     forwardEvent = BChan.writeBChan (getBChan s) . OEvent
