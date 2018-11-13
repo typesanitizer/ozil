@@ -106,10 +106,12 @@ render ls = \case
       Plain t -> txtWrap t
       Tabular tt ents inds -> vBox . V.toList $ V.imap (\j -> renderEntry i j a tt inds) ents
     defaultPadding = 4
+    -- TODO: There is still an off-by-one error hiding somewhere. Try ozil ozil.
     renderEntry i j a tblTy
       ItemIndent{itemIndent, descIndent}
-      TableEntry{_name=item, _description=desc} =
-      padLeftRight defaultPadding (layout [itemWidget, descWidget])
+      TableEntry{_name=item, _description=desc}
+      = padRight (Pad defaultPadding)
+      $ padLeft (Pad itemIndent) (layout [itemWidget, descWidget])
       where
         layout = itemFits hBox (padTopBottom 1 . vBox)
         itemWidget = highlight (txtWrap item)
