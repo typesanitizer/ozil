@@ -22,7 +22,9 @@ module Help.Page
 import Commons
 
 import Help.Page.Man
-  ( emptyManPage, ManPage (..), WhatisDescription (..), parseWhatisDescription )
+  ( parseManPage, emptyManPage, ManPage (..), ManPageView (_manPageViewRest)
+  , WhatisDescription (..), parseWhatisDescription
+  )
 import Help.Page.Help
 
 import Brick hiding (txt, render)
@@ -64,7 +66,7 @@ parseShortHelp :: Text -> HelpPage
 parseShortHelp = parseLongHelp
 
 parseMan :: Text -> ManPage
-parseMan txt = emptyManPage { _manPageRest = txt }
+parseMan = parseManPage
 
 data LinkState
   = LinksOff {len :: !Int, _prev :: !Int}
@@ -89,7 +91,7 @@ mapLinkState f = \case
 
 render :: LinkState -> DocPage -> Widget n
 render ls = \case
-  Man m -> txtWrap (_manPageRest m)
+  Man m -> txtWrap (_manPageViewRest $ _manPageView m)
   LongHelp  HelpPage{_helpPageBody = v, _helpPageAnchors = a} -> widgets a v
   ShortHelp HelpPage{_helpPageBody = v, _helpPageAnchors = a} -> widgets a v
   where

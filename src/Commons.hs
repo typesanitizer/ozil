@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeFamilies #-}
+
 module Commons
   ( module Control.Exception
   , module Control.Lens
@@ -21,6 +23,7 @@ module Commons
   , Optional
   , (===)
   , (|||)
+  , takeWhile1P'
   )
   where
 
@@ -39,6 +42,7 @@ import qualified Data.Vector.Unboxed
 import Data.Void
 import GHC.Stack (HasCallStack)
 import Text.Printf (printf)
+import Text.Megaparsec (MonadParsec, Tokens, Token, takeWhile1P)
 
 import System.Process (readProcessWithExitCode)
 import System.Exit (ExitCode (..))
@@ -71,3 +75,6 @@ type Optional = Maybe Text
 
 (|||) :: Brick.Widget n -> Brick.Widget n -> Brick.Widget n
 (|||) = (Brick.<+>)
+
+takeWhile1P' :: MonadParsec e s m => (Token s -> Bool) -> m (Tokens s)
+takeWhile1P' = takeWhile1P Nothing
