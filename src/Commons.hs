@@ -10,6 +10,7 @@ module Commons
   , module Data.Function
   , module Data.List.NonEmpty
   , module Data.Maybe
+  , module Data.Pair
   , module Data.Text
   , module Data.Vector
   , UVector
@@ -36,6 +37,7 @@ import Data.Coerce
 import Data.Function ((&), on)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe
+import Data.Pair
 import Data.Text (Text, pack, unpack)
 import Data.Vector (Vector)
 import qualified Data.Vector.Unboxed

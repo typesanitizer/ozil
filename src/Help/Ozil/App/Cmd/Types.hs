@@ -7,7 +7,7 @@ module Help.Ozil.App.Cmd.Types
 
 import Commons
 
-import Control.Lens (Getter, Iso', iso)
+import Control.Lens (Iso', iso)
 import Control.Lens.TH (makePrisms)
 
 data ConfigOptions
