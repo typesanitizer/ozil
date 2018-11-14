@@ -108,13 +108,51 @@ wrapLines settings limit vs = V.unfoldr spill (Pair V.empty (vs :| []))
       in (took, rest, new_ents)
 
 data SplitWord = Split | Whole
-  deriving Eq
 
 padEntry :: Int -> Entry 'NE
 padEntry w = assert (w > 0)
   $ Entry {_txt = T.replicate w " ", width = w, attrIx = -1} :: Entry 'NE
 
--- TODO: This function is too big...
+padLeft :: WrapSettings -> Int -> Vector (Entry 'NE) -> Vector (Entry 'NE)
+padLeft settings indent =
+  if preserveIndentation settings && indent > 0
+  then V.cons (padEntry indent)
+  else id
+
+padRight :: Int -> Vector (Entry 'NE) -> Vector (Entry 'NE)
+padRight i = assert (i >= 0) $ if i == 0 then id else flip V.snoc (padEntry i)
+
+data Ixs = Ixs { usedWidth :: !Int, range :: !(Pair Int Int) }
+
+breakIxs :: Vector Token -> WrapSettings -> Int -> Bool -> Ixs -> (SplitWord, Ixs)
+breakIxs tokens settings availWidth = go
+  where
+    availLength = V.length tokens
+    go trimPrefixWS ixs@Ixs{usedWidth, range = Pair start_i end_i} =
+      if | end_i == availLength || usedWidth == availWidth -> (Whole, ixs)
+         -- Now end_i < availLength
+         -- Remove whitespace at the beginning of the line.
+         | trimPrefixWS ->
+           if | not (isWS (tokens V.! end_i)) -> go False ixs
+              | otherwise -> go True ixs{range = Pair (start_i + 1) (end_i + 1)}
+         -- trimPrefixWS is False now
+         -- usedWidth < availWidth by induction
+         | otherwise ->
+           assert (usedWidth < availWidth)
+           $ let width_i = width (entry (tokens V.! end_i))
+                 usedWidth' = usedWidth + width_i
+                 firstTokenVeryWide = end_i == 0 &&
+                   assert (usedWidth == 0) (width_i > availWidth)
+             in
+             if | usedWidth' <= availWidth ->
+                  go False (Ixs usedWidth' (Pair start_i (end_i + 1)))
+                -- Now usedWidth' > availWidth
+                | firstTokenVeryWide ->
+                  ( if breakLongWords settings then Split else Whole
+                  , Ixs availWidth (Pair 0 1)
+                  )
+                | otherwise -> (Whole, ixs)
+
 makeLineFromToks
   :: Int
   -> WrapSettings
@@ -124,51 +162,24 @@ makeLineFromToks
 makeLineFromToks indent settings limit toks = (lhs, rhs)
   where
     remWidth = if preserveIndentation settings then limit - indent else limit
-
-    consIndentation :: Vector (Entry 'NE) -> Vector (Entry 'NE)
-    consIndentation =
-      if preserveIndentation settings && indent > 0 then
-      V.cons (padEntry indent)
-      else id
-
-    snocPadding :: Int -> Vector (Entry 'NE) -> Vector (Entry 'NE)
-    snocPadding used_w = assert (used_w <= remWidth)
-      $ if remWidth == used_w then id else flip V.snoc (padEntry (remWidth - used_w))
-
-    go tw w si ei =
-      if | ei == V.length toks || w == remWidth  -> (Whole, w, si, ei)
-         -- Now ei < V.length toks
-         -- Remove whitespace at the beginning of the line.
-         | tw -> if | isWS (toks V.! ei) -> go True w (si + 1) (ei + 1)
-                    | otherwise          -> go False w si ei
-         -- tw is False now
-         -- w < remWidth by induction
-         | otherwise ->
-           assert (w < remWidth)
-           $ let w_i = width (entry (toks V.! ei)) in
-             if | w + w_i <= remWidth -> go False (w + w_i) si (ei + 1)
-                -- w + w_i > remWidth
-                | ei == 0 && assert (w == 0 && si == 0) (w_i > remWidth) ->
-                  (if breakLongWords settings then Split else Whole, remWidth, 0, 1)
-                -- ei > 0
-                | otherwise -> (Whole, w, si, ei)
-    (splitFirstWord, usedW, start_i, end_i) = go True 0 0 0
-    (lhs, rhs) = assert (end_i > 0) . assert (end_i > start_i)
-      $ if splitFirstWord == Split
-        then (let Entry{_txt,width,attrIx} = entry (toks V.! 0)
-                  (t1, rem_w, t2) = splitAtWidth usedW _txt
-                  e1 = Entry { _txt = t1 <> T.replicate rem_w " "
-                             , width = usedW, attrIx } :: Entry 'NE
-                  e2 = assert (not (T.null t2))
-                       $ Entry { _txt = t2, width = width - usedW, attrIx }
-                  hdTok = Token { isWS = False, entry = e2 }
-              in (consIndentation $ V.singleton e1, V.cons hdTok (V.tail toks))
-             )
-        else (let (takeToks, remToks) =
-                    V.splitAt (end_i - start_i) (V.drop start_i toks)
-                  ents = V.map entry takeToks
-             in (consIndentation $ snocPadding usedW ents, remToks)
-             )
+    indentEntries = padLeft settings indent
+    (splitFirstWord, Ixs{usedWidth, range = Pair start_i end_i}) =
+      breakIxs toks settings remWidth True (Ixs 0 (Pair 0 0))
+    (lhs, rhs) = assert (end_i > 0) $ case splitFirstWord of
+      Whole ->
+        let (takeToks, remToks) = assert (end_i > start_i)
+              $ V.splitAt (end_i - start_i) (V.drop start_i toks)
+            ents = V.map entry takeToks
+        in (indentEntries $ padRight (remWidth - usedWidth) ents, remToks)
+      Split ->
+        let Entry{_txt,width,attrIx} = entry (toks V.! 0)
+            (t1, rem_w, t2) = splitAtWidth usedWidth _txt
+            e1 = Entry { _txt = t1 <> T.replicate rem_w " "
+                       , width = usedWidth, attrIx } :: Entry 'NE
+            e2 = assert (not (T.null t2))
+              $ Entry { _txt = t2, width = width - usedWidth, attrIx }
+            hdTok = Token { isWS = False, entry = e2 }
+        in (indentEntries $ V.singleton e1, V.cons hdTok (V.tail toks))
 
 -- If the supplied width is too large, the second text will be empty.
 splitAtWidth :: Int -> Text -> (Text, Int, Text)
