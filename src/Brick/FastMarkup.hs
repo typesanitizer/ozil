@@ -3,14 +3,9 @@
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ViewPatterns        #-}
 {-# LANGUAGE MultiWayIf          #-}
-{-# LANGUAGE TypeApplications    #-}
+{-# LANGUAGE DeriveAnyClass      #-}
 
 module Brick.FastMarkup where
-  -- ( FastMarkup
-  -- , mkFastMarkup
-  -- , fmWrapWith
-  -- , fmWrap
-  -- ) where
 
 import Commons
 
@@ -18,8 +13,6 @@ import Brick (textWidth, Widget (..))
 import Brick.Markup (GetAttr (..))
 import Data.Functor.Identity (Identity (..))
 import Data.Char (isSpace)
-import Data.Foldable (fold)
-import Data.Monoid (Sum(..))
 import Text.Wrap (defaultWrapSettings, WrapSettings (..))
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -36,9 +29,9 @@ data Emptiness
 
 data Entry (ne :: Emptiness) =
   Entry { _txt :: !Text, width :: !Int, attrIx :: !Int }
-  deriving Show
+  deriving (Show, Generic, NFData)
 
-data FastMarkup a = FastMarkup !(Vector (Entry 'NE)) !(Vector a)
+data FastMarkup a = FastMarkup !(Vector Token) !(Vector a)
 
 -- Postcondition: Entries have non-empty Text values.
 mkFastMarkup :: Ord a => [(Text, a)] -> FastMarkup a
@@ -46,7 +39,7 @@ mkFastMarkup (filter (not . T.null . fst) -> tas) =
   let (_, as) = unzip tas
       as_list = Set.toList (Set.fromList as)
       as_map = Map.fromAscList (zip as_list [0 ..])
-      tps = V.fromList
+      tps = V.concatMap tokenize $ V.fromList
         [ Entry t (textWidth t) i | (t, a) <- tas, let i = as_map Map.! a ]
   in FastMarkup tps (V.fromList as_list)
 
@@ -81,39 +74,27 @@ fmWrapWith settings (FastMarkup tis as) =
                   else Vty.horizCat [simpleImg, padding]
         in set Brick.imageL (Vty.vertCat (V.toList lineImgs)) Brick.emptyResult
 
-type Accum = Pair (Vector Token) (NonEmpty (Vector (Entry 'NE)))
+type Accum = Vector Token
 
 wrapLines
-  :: HasCallStack
-  => WrapSettings
-  -> Int                -- ^ Wrapping width
-  -> Vector (Entry 'NE)
+  :: WrapSettings
+  -> Int          -- ^ Wrapping width
+  -> Vector Token
   -> Vector (Vector (Entry 'NE))
-wrapLines settings limit vs = V.unfoldr spill (Pair V.empty (vs :| []))
+wrapLines settings limit vs = V.unfoldr spill vs
   where
-    indent = V.span (T.all isSpace . _txt) vs
-      & (\(wsEnts, notWsEnts) -> getSum
-           $ foldMap (Sum . width) wsEnts
-           <> fold @Maybe (Sum . textWidth . T.takeWhile isSpace . _txt
-                           <$> V.headM notWsEnts))
+    indent :: Int
+    indent = if | V.length vs == 0 -> 0
+                | otherwise ->
+                  let x = vs V.! 0 in
+                  if | isWS x    -> width (entry x)
+                     | otherwise -> 0
 
     spill :: Accum -> Maybe (Vector (Entry 'NE), Accum)
-    spill (Pair toks (e :| es)) =
-      if V.length toks > 0 || V.length e > 0 then
-        let (theLine, newToks, rest) = makeLine toks e
-        in Just (theLine, Pair newToks (rest :| es))
-      else case es of
-        [] -> Nothing
-        x : xs -> spill (Pair V.empty (x :| xs))
-
-    makeLine :: Vector Token
-             -> Vector (Entry 'NE)
-             -> (Vector (Entry 'NE), Vector Token, Vector (Entry 'NE))
-    makeLine tks ents =
-      let (use_toks, new_ents) = if V.length tks > 0 then (tks, ents)
-                                 else (tokenize (V.head ents), V.tail ents)
-          (took, rest) = makeLineFromToks indent settings limit use_toks
-      in (took, rest, new_ents)
+    spill toks =
+      if V.length toks > 0 && V.any (not . isWS) toks
+      then Just (makeLineFromToks indent settings limit toks)
+      else Nothing
 
 data SplitWord = Split | Whole
 

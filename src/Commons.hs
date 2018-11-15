@@ -1,7 +1,8 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Commons
-  ( module Control.Exception
+  ( module Control.DeepSeq
+  , module Control.Exception
   , module Control.Lens
   , module Control.Lens.TH
   , module Control.Monad
@@ -15,6 +16,7 @@ module Commons
   , module Data.Vector
   , UVector
   , module Data.Void
+  , module GHC.Generics
   , module GHC.Stack
   , module Text.Printf
   , readProcessSimple
@@ -29,6 +31,7 @@ module Commons
   )
   where
 
+import Control.DeepSeq (force, NFData(..))
 import Control.Exception (assert)
 import Control.Lens ((^.), (^?), (<&>), view, set, over, _1, _2)
 import Control.Lens.TH (makeFields)
@@ -43,6 +46,7 @@ import Data.Text (Text, pack, unpack)
 import Data.Vector (Vector)
 import qualified Data.Vector.Unboxed
 import Data.Void
+import GHC.Generics (Generic (..))
 import GHC.Stack (HasCallStack)
 import Text.Printf (printf)
 import Text.Megaparsec (MonadParsec, Tokens, Token, takeWhile1P)

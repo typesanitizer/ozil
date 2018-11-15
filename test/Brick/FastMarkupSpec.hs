@@ -57,20 +57,20 @@ hprop_wrapLineFit = property $ do
     wrapping = wrapConv settings
     settings = WrapSettings {preserveIndentation = False, breakLongWords = False}
 
-wrapConv s n ts = allEntriesToText $ wrapLines s n (V.fromList (fmap textToEntry ts))
+wrapConv s n ts = allEntriesToText
+  $ wrapLines s n (V.concatMap tokenize $ V.fromList (fmap textToEntry ts))
 
 spec_wrapLines :: Spec
 spec_wrapLines = it "wrap lines works" $ do
-   wrapping 2 ["a", "a"] `shouldBe` "aa"
---   wrapping 3  ["ab cd "] `shouldBe` "ab \ncd "
---   wrapping 4  ["abcdef"] `shouldBe` "abcdef"
+  wrapping 2 ["a", "b"] `shouldBe` "ab"
+  wrapping 3 ["ab cd "] `shouldBe` "ab \ncd "
+  wrapping 4 ["abcdef"] `shouldBe` "abcdef"
 
-     -- wrapping 1 ["
---   wrapping 10 ["hello world"]        `shouldBe` "hello     \nworld     "
---   wrapping 10 ["hello", "world"]     `shouldBe` "helloworld"
---   wrapping 10 ["hello  ", "  world"] `shouldBe` "hello     \nworld     "
+  wrapping 10 ["hello world"]        `shouldBe` "hello     \nworld     "
+  wrapping 10 ["hello", "world"]     `shouldBe` "helloworld"
+  wrapping 10 ["hello  ", "  world"] `shouldBe` "hello     \nworld     "
 
---   wrapping 10 ["abcdef", "gh jklmn"] `shouldBe` "abcdefgh  \njklmn     "
+  wrapping 10 ["abcdef", "gh jklmn"] `shouldBe` "abcdefgh  \njklmn     "
   where
 --     wrapping' = wrapConv settings'
 --     settings' = WrapSettings {preserveIndentation = False, breakLongWords = True}

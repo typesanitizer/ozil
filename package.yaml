@@ -108,6 +108,7 @@ library:
   - split >= 0.2.3 && < 0.3
   - mtl >= 2.2.2 && < 2.3
   - lens >= 4.16 && < 4.18
+  - deepseq
   # misc
   - zlib >= 0.6.2 && < 0.7
 
