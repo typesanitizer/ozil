@@ -92,7 +92,6 @@ getManPageSummaries = do
       pure $ case ecode of
         ExitFailure _ -> []
         ExitSuccess   -> map parseManPageSummary (lines out)
-        -- ^ No need to parse it right away.
   where
     go InputPath{} = unimplementedError
     go (InputFile ty nm) = case ty of
@@ -168,8 +167,7 @@ getHelpPage (HelpPageSummary binpath short _) =
 -- * Selection process
 
 runSelectionApp
-  :: HasCallStack
-  => NonEmpty DocPageSummary
+  :: NonEmpty DocPageSummary
   -> IO (DocPageSummary, SaveSelection)
 runSelectionApp dps = do
   let len = NE.length dps

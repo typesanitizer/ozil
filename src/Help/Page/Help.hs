@@ -204,18 +204,21 @@ twoColumn tt itemP itmIndentsIn lx saveIndents = do
   -- Done
   pure (Tabular tt (pure (TableEntry itm desc)) (ItemIndent itmCol descCol))
 
+-- | OK, this one is a weird heuristic. The idea is that description blocks
+-- are usually deeply indented, so it would be odd if a description block
+-- was way over to the left. This helps us "catch" cases where you have
+-- paragraphs of indented text right at the beginning. Usually it will be in
+-- a sentence form, and the first word won't be that long (hopefully?).
+descriptionBlockIsDeeplyIndented :: Int -> Bool
+descriptionBlockIsDeeplyIndented = (>= 16)
+
 descriptionP
   :: MonadParsec e Text m
   => Int       -- ^ Current column
   -> Maybe Int -- ^ Indentation for description, if known.
   -> m Text
 descriptionP descCol descIndent = do
-  guard (descCol >= 16)
-  -- ^ OK, this one is a weird heuristic. The idea is that description blocks
-  -- are usually deeply indented, so it would be odd if a description block
-  -- was way over to the left. This helps us "catch" cases where you have
-  -- paragraphs of indented text right at the beginning. Usually it will be in
-  -- a sentence form, and the first word won't be that long (hopefully?).
+  guard (descriptionBlockIsDeeplyIndented descCol)
   guard (descIndent `isNothingOrJustEq` descCol)
   firstLine <- descrLine
   let nextLineP = try $ do

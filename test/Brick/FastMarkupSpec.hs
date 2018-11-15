@@ -9,16 +9,15 @@ import Brick (textWidth)
 import Text.Wrap
 import Data.Foldable (foldlM, toList)
 import Data.List.NonEmpty (NonEmpty (..))
-import Debug.Trace (trace)
 import Hedgehog
 import Test.Hspec
-import Test.Tasty
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import qualified Data.List.NonEmpty as NE
 import qualified Hedgehog.Gen as HG
 import qualified Hedgehog.Range as HR
 
+shortNonEmptyText :: Gen Text
 shortNonEmptyText = HG.text (HR.linear 1 100) (HG.choice [pure ' ', HG.alpha])
 
 hprop_tokenize :: Property
@@ -57,6 +56,7 @@ hprop_wrapLineFit = property $ do
     wrapping = wrapConv settings
     settings = WrapSettings {preserveIndentation = False, breakLongWords = False}
 
+wrapConv :: WrapSettings -> Int -> [Text] -> Text
 wrapConv s n ts = allEntriesToText
   $ wrapLines s n (V.concatMap tokenize $ V.fromList (fmap textToEntry ts))
 
