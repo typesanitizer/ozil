@@ -21,18 +21,16 @@ module Help.Page
 
 import Commons
 
-import Help.Page.Man
-  ( parseManPage, emptyManPage, ManPage (..), ManPageView (..)
-  , WhatisDescription (..), parseWhatisDescription, Chunk (..)
-  )
 import Help.Page.Help
 
-import Brick hiding (txt, render)
-import Brick.FastMarkup (mkFastMarkup, fmWrap)
+import Help.Page.Man
+  ( parseManPage, ManPage (..), ManPageView (..), WhatisDescription (..)
+  , parseWhatisDescription)
 
-import Brick.Markup (markup, Markup)
+import Brick hiding (txt, render)
+
+import Brick.FastMarkup (fmWrap)
 import Data.Monoid (Sum(..))
-import Data.Text.Markup (fromText)
 import Text.Wrap (WrapSettings (..))
 
 import qualified Brick
@@ -103,18 +101,16 @@ render ls = \case
   ShortHelp h -> renderHelpPage ls h
 
 renderManPage :: ManPage -> Widget n
-renderManPage (ManPage (ManPageView h secs _) _) =
-  Brick.str (show $ getSum (foldMap (Sum . V.length . snd) secs))
+renderManPage (ManPage (ManPageView h sections _ fm) _) =
+  Brick.str (show $ getSum (foldMap (Sum . V.length . snd) sections))
   ===
-  vBox (renderHeading h : each renderSection secs)
+  vBox (renderHeading h : each renderSection sections)
   where
     renderHeading = const emptyWidget
-    each f = V.toList . V.map f
-    renderSection (sh, chnks) = vBox
-      [renderSectionHeading sh, fmWrap $ mkFastMarkup
-        $ V.toList $ fmap ((,"subc-link" :: AttrName) . renderChunk) chnks]
+    each f = V.toList . V.imap f
+    renderSection i (sh, _chnks) = vBox
+      [renderSectionHeading sh, fmWrap (fm V.! i)]
     renderSectionHeading = Brick.txt
-    renderChunk (Chunk txt _) = txt
 
 renderHelpPage :: LinkState -> HelpPage -> Widget n
 renderHelpPage ls HelpPage{_helpPageBody = v, _helpPageAnchors = a} =

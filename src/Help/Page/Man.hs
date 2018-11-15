@@ -15,6 +15,8 @@ module Help.Page.Man
 
 import Commons
 
+import Brick (AttrName)
+import Brick.FastMarkup (FastMarkup, mkFastMarkup)
 import Control.Monad.State.Strict
 import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
@@ -95,6 +97,7 @@ data ManPageView = ManPageView
   { _manPageViewHeading :: !Heading
   , _manPageViewSection :: !(Vector (Text, Chunks))
   , _manPageViewRest    :: !Text
+  , _manPageFastMarkup  :: !(Vector (FastMarkup Brick.AttrName))
   }
 
 data ManPageMetadata = ManPageMetadata
@@ -103,7 +106,9 @@ data ManPageMetadata = ManPageMetadata
   }
 
 emptyManPage :: ManPage
-emptyManPage = ManPage (ManPageView emptyHeading mempty "") (ManPageMetadata mempty mempty)
+emptyManPage = ManPage
+  (ManPageView emptyHeading mempty "" undefined)
+  (ManPageMetadata mempty mempty)
 
 -- Ossanna and Kernighan's "Troff User's manual" seems to at least have the
 -- comment syntax "correct" (it matches up with man.1). I guess I will just have
@@ -114,9 +119,13 @@ emptyManPage = ManPage (ManPageView emptyHeading mempty "") (ManPageMetadata mem
 parseManPage :: Text -> ManPage
 parseManPage t =
   ManPage
-  (ManPageView h (secs rets') t)
+  (ManPageView h sections t fm)
   (ManPageMetadata (V.fromList inp) (V.reverse $ V.fromList ps))
   where
+    fm = V.map (mkFastMarkup . V.toList
+                . fmap ((,"subc-link" :: AttrName) . (\(Chunk z _) -> z)) . snd)
+         sections
+    sections = mkSections rets'
     inp = T.lines t
     (rets, PS ps) =
       flip runState (PS [])
@@ -146,8 +155,8 @@ parseManPage t =
       Comment _ -> (Nothing, chks)
       Heading _ -> error "Heading should not have existed here."
 
-    secs :: [ManPageLine] -> Vector (Text, Chunks)
-    secs = V.fromList . catMaybes . chop
+    mkSections :: [ManPageLine] -> Vector (Text, Chunks)
+    mkSections = V.fromList . catMaybes . chop
       (\(l:ls) -> case l of
           Markup (Chunk sh (Dir "SH")) ->
             let (chks, rest) = break isSH ls
