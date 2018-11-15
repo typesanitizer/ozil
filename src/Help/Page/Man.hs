@@ -135,8 +135,10 @@ parseManPage t =
     (tmp', tmp) = break isHeading
       $ zipWith (\i v -> fromRight (error (errmsg i v)) v) [1 :: Int ..] rets
 
+    assertNoMoreHeadings xs = assert (not $ any isHeading xs) xs
+
     (Heading h, rets') = case tmp of
-      (Heading h' : rest) -> (Heading h', rest)
+      (Heading h' : rest) -> (Heading h', assertNoMoreHeadings rest)
       _ -> error (show (take 20 tmp') ++ "\n" ++ show (take 10 tmp))
 
     isHeading = \case Heading _ -> True; _ -> False

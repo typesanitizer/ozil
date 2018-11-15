@@ -24,6 +24,7 @@ module Commons
   , Optional
   , (===)
   , (|||)
+  , (!!!)
   , takeWhile1P'
   )
   where
@@ -50,6 +51,7 @@ import System.Process (readProcessWithExitCode)
 import System.Exit (ExitCode (..))
 
 import qualified Brick
+import qualified Data.Vector.Generic as V
 import qualified Graphics.Vty as Vty
 
 type UVector = Data.Vector.Unboxed.Vector
@@ -80,3 +82,7 @@ type Optional = Maybe Text
 
 takeWhile1P' :: MonadParsec e s m => (Token s -> Bool) -> m (Tokens s)
 takeWhile1P' = takeWhile1P Nothing
+
+(!!!) :: HasCallStack => V.Vector v a => v a -> Int -> a
+(!!!) v i = fromMaybe err $ v V.!? i
+  where err = error (printf "OOB indexing! i = %d, vlen = %d" i (V.length v))
