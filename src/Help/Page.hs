@@ -108,8 +108,10 @@ renderManPage (ManPage (ManPageView h sections _ fm) _) =
   where
     renderHeading = const emptyWidget
     each f = V.toList . V.imap f
-    renderSection i (sh, _chnks) = vBox
-      [renderSectionHeading sh, fmWrap (fm V.! i)]
+    renderSection _i (sh, _chnks) = vBox
+      [renderSectionHeading sh, fmWrap (fm !!! 0)]
+    -- renderSection i (sh, _chnks) = vBox
+    --   [renderSectionHeading sh, fmWrap (fm !!! i)]
     renderSectionHeading = Brick.txt
 
 renderHelpPage :: LinkState -> HelpPage -> Widget n
@@ -141,6 +143,6 @@ renderHelpPage ls HelpPage{_helpPageBody = v, _helpPageAnchors = a} =
           LinksOff{} -> id
           LinksOn{} | tblTy /= Subcommand  -> id
           LinksOn _ k -> withAttr
-            $ if a V.! k == (i, j) then "subc-highlight" else "subc-link"
+            $ if a !!! k == (i, j) then "subc-highlight" else "subc-link"
         delta_x = itemFits gap 4
         extraIndent = hLimit delta_x (vLimit 1 (fill ' '))

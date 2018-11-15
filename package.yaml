@@ -102,3 +102,11 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - ozil
+    - hedgehog
+    - hspec
+    - tasty
+    - tasty-hspec
+    - tasty-discover
+    - tasty-hedgehog
+    - vector
+    - brick

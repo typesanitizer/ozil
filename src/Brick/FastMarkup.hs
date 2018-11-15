@@ -5,12 +5,12 @@
 {-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE TypeApplications    #-}
 
-module Brick.FastMarkup
-  ( FastMarkup
-  , mkFastMarkup
-  , fmWrapWith
-  , fmWrap
-  ) where
+module Brick.FastMarkup where
+  -- ( FastMarkup
+  -- , mkFastMarkup
+  -- , fmWrapWith
+  -- , fmWrap
+  -- ) where
 
 import Commons
 
@@ -36,6 +36,7 @@ data Emptiness
 
 data Entry (ne :: Emptiness) =
   Entry { _txt :: !Text, width :: !Int, attrIx :: !Int }
+  deriving Show
 
 data FastMarkup a = FastMarkup !(Vector (Entry 'NE)) !(Vector a)
 
@@ -53,7 +54,7 @@ fmWrap :: GetAttr a => FastMarkup a -> Widget n
 fmWrap = fmWrapWith defaultWrapSettings
 
 -- | FastMarkup analog of txtWrapWith
-fmWrapWith :: GetAttr a => WrapSettings -> FastMarkup a -> Widget n
+fmWrapWith :: HasCallStack => GetAttr a => WrapSettings -> FastMarkup a -> Widget n
 fmWrapWith settings (FastMarkup tis as) =
   Widget Brick.Greedy Brick.Fixed $ do
     c <- Brick.getContext
@@ -62,18 +63,18 @@ fmWrapWith settings (FastMarkup tis as) =
         horizCat' = Vty.horizCat . V.toList
           . V.map (\(Entry t _ i :: Entry 'NE) ->
                      -- TFW your Haskell code looks like C code :(
-                     let attr_i = if i == -1 then Vty.defAttr else attrs V.! i
+                     let attr_i = if i == -1 then Vty.defAttr else attrs !!! i
                      in Vty.text' attr_i t
                   )
     pure $ case V.length theLines of
       0 -> Brick.emptyResult
-      1 -> set Brick.imageL (horizCat' (theLines V.! 0)) Brick.emptyResult
+      1 -> set Brick.imageL (horizCat' (theLines !!! 0)) Brick.emptyResult
       _ ->
         let lengths = V.map (V.sum . V.map width) theLines
             maxLen = V.maximum lengths
             lineImgs = V.imap lineImg theLines
             lineImg i line =
-              let delta = maxLen - (lengths V.! i)
+              let delta = maxLen - (lengths !!! i)
                   simpleImg = horizCat' line
                   padding = Vty.text' (c ^. Brick.attrL) (T.replicate delta " ")
               in if delta == 0 then simpleImg
@@ -83,7 +84,8 @@ fmWrapWith settings (FastMarkup tis as) =
 type Accum = Pair (Vector Token) (NonEmpty (Vector (Entry 'NE)))
 
 wrapLines
-  :: WrapSettings
+  :: HasCallStack
+  => WrapSettings
   -> Int                -- ^ Wrapping width
   -> Vector (Entry 'NE)
   -> Vector (Vector (Entry 'NE))
@@ -130,6 +132,7 @@ padRight i = assert (i >= 0) $ if i == 0 then id else flip V.snoc (padEntry i)
 
 data Ixs = Ixs { usedWidth :: !Int, range :: !(Pair Int Int) }
 
+{-# INLINE breakIxs #-}
 breakIxs :: Vector Token -> WrapSettings -> Int -> Bool -> Ixs -> (SplitWord, Ixs)
 breakIxs tokens settings availWidth = go
   where
@@ -139,13 +142,13 @@ breakIxs tokens settings availWidth = go
          -- Now end_i < availLength
          -- Remove whitespace at the beginning of the line.
          | trimPrefixWS ->
-           if | not (isWS (tokens V.! end_i)) -> go False ixs
+           if | not (isWS (tokens !!! end_i)) -> go False ixs
               | otherwise -> go True ixs{range = Pair (start_i + 1) (end_i + 1)}
          -- trimPrefixWS is False now
          -- usedWidth < availWidth by induction
          | otherwise ->
            assert (usedWidth < availWidth)
-           $ let width_i = width (entry (tokens V.! end_i))
+           $ let width_i = width (entry (tokens !!! end_i))
                  usedWidth' = usedWidth + width_i
                  firstTokenVeryWide = end_i == 0 &&
                    assert (usedWidth == 0) (width_i > availWidth)
@@ -159,6 +162,7 @@ breakIxs tokens settings availWidth = go
                   )
                 | otherwise -> (Whole, ixs)
 
+{-# INLINE makeLineFromToks #-}
 makeLineFromToks
   :: Int
   -> WrapSettings
@@ -178,7 +182,7 @@ makeLineFromToks indent settings limit toks = (lhs, rhs)
             ents = V.map entry takeToks
         in (indentEntries $ padRight (remWidth - usedWidth) ents, remToks)
       Split ->
-        let Entry{_txt,width,attrIx} = entry (toks V.! 0)
+        let Entry{_txt,width,attrIx} = entry (toks !!! 0)
             (t1, rem_w, t2) = splitAtWidth usedWidth _txt
             e1 = Entry { _txt = t1 <> T.replicate rem_w " "
                        , width = usedWidth, attrIx } :: Entry 'NE
@@ -188,6 +192,7 @@ makeLineFromToks indent settings limit toks = (lhs, rhs)
         in (indentEntries $ V.singleton e1, V.cons hdTok (V.tail toks))
 
 -- If the supplied width is too large, the second text will be empty.
+{-# INLINE splitAtWidth #-}
 splitAtWidth :: Int -> Text -> (Text, Int, Text)
 splitAtWidth max_w t = (fromVec v_pre, max_w - used_w, fromVec v_post)
   where
@@ -196,14 +201,16 @@ splitAtWidth max_w t = (fromVec v_pre, max_w - used_w, fromVec v_post)
     v = V.fromList $ T.unpack t
     vlen = V.length v
     go w i = if i == vlen then (w, i)
-             else let w_i = textWidth (Identity (v V.! i))
+             else let w_i = textWidth (Identity (v !!! i))
                   in if | w + w_i > max_w -> (w, i)
                         | otherwise -> go (w + w_i) (i + 1)
     (used_w, ix) = go 0 0
     (v_pre, v_post) = V.splitAt ix v
 
 data Token = Token { isWS :: !Bool, entry :: !(Entry 'NE) }
+  deriving Show
 
+{-# INLINE tokenize #-}
 tokenize :: Entry 'NE -> Vector Token
 tokenize = V.unfoldr $ \(Entry{_txt = t, width, attrIx} :: Entry 'NE) ->
   if T.null t

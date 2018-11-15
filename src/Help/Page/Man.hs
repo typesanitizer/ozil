@@ -122,9 +122,29 @@ parseManPage t =
   (ManPageView h sections t fm)
   (ManPageMetadata (V.fromList inp) (V.reverse $ V.fromList ps))
   where
-    fm = V.map (mkFastMarkup . V.toList
-                . fmap ((,"subc-link" :: AttrName) . (\(Chunk z _) -> z)) . snd)
-         sections
+    fm = V.singleton $ mkFastMarkup
+      [ ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
+      ]
+    -- fm = V.map (mkFastMarkup . V.toList
+    --             . fmap ((,"subc-link" :: AttrName) . (\(Chunk z _) -> z)) . snd)
+    --      sections
     sections = mkSections rets'
     inp = T.lines t
     (rets, PS ps) =
