@@ -5,15 +5,17 @@ module Brick.FastMarkupSpec where
 import Commons hiding ((===))
 import Brick.FastMarkup
 
-import Brick (textWidth)
-import Text.Wrap
-import Data.Foldable (foldlM, toList)
-import Data.List.NonEmpty (NonEmpty (..))
 import Hedgehog
 import Test.Hspec
+
+import Brick (textWidth)
+import Text.Wrap (WrapSettings (..))
+import Data.Foldable (foldlM, toList)
+import Data.List.NonEmpty (NonEmpty (..))
+
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import qualified Data.Vector as V
-import qualified Data.List.NonEmpty as NE
 import qualified Hedgehog.Gen as HG
 import qualified Hedgehog.Range as HR
 
@@ -72,7 +74,5 @@ spec_wrapLines = it "wrap lines works" $ do
 
   wrapping 10 ["abcdef", "gh jklmn"] `shouldBe` "abcdefgh  \njklmn     "
   where
---     wrapping' = wrapConv settings'
---     settings' = WrapSettings {preserveIndentation = False, breakLongWords = True}
     wrapping = wrapConv settings
     settings = WrapSettings {preserveIndentation = False, breakLongWords = False}
