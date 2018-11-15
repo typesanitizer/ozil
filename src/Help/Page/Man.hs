@@ -192,12 +192,12 @@ knownDirectives = Set.fromList ["SH", "B", "RB", "RI", "IR", "I", "br"]
 newtype PS = PS {unrecognized :: [Int]}
 
 manPageLineP :: Int -> Parser ManPageLine
-manPageLineP i =
+manPageLineP line_num =
   (eof *> pure (Markup (Chunk "" None)))
   <|> startsWithDotP
-  <|> wthP
+  <|> fallbackP
   where
-    wthP = fmap Markup . Chunk <$> takeWhile1P' (/= '\n') <*> pure None
+    fallbackP = fmap Markup . Chunk <$> takeWhile1P' (const True) <*> pure None
     fullLine = takeWhileP Nothing (const True)
     commentP = Comment <$> try (string "\\\"" *> fullLine)
     startsWithDotP =
@@ -210,9 +210,10 @@ manPageLineP i =
                txt <- fullLine
                let recognized = dir `Set.member` knownDirectives
                unless recognized
-                 $ modify (\ps -> ps{unrecognized = i : unrecognized ps})
+                 $ modify (\ps -> ps{unrecognized = line_num : unrecognized ps})
                pure (Markup (Chunk txt (Dir dir)))
-            <|> wthP
+            -- TODO: The following line doesn't make any sense.
+            <|> fallbackP
             )
           )
 
