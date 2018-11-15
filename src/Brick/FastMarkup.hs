@@ -9,6 +9,7 @@ module Brick.FastMarkup
   ( FastMarkup
   , mkFastMarkup
   , fmWrapWith
+  , fmWrap
   ) where
 
 import Commons
@@ -19,7 +20,7 @@ import Data.Functor.Identity (Identity (..))
 import Data.Char (isSpace)
 import Data.Foldable (fold)
 import Data.Monoid (Sum(..))
-import Text.Wrap (WrapSettings (..))
+import Text.Wrap (defaultWrapSettings, WrapSettings (..))
 import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Brick
@@ -33,7 +34,8 @@ data Emptiness
   = NE -- ^ Not Empty
   | PE -- ^ Perhaps Empty
 
-data Entry (ne :: Emptiness) = Entry { _txt :: !Text, width :: !Int, attrIx :: !Int }
+data Entry (ne :: Emptiness) =
+  Entry { _txt :: !Text, width :: !Int, attrIx :: !Int }
 
 data FastMarkup a = FastMarkup !(Vector (Entry 'NE)) !(Vector a)
 
@@ -43,8 +45,12 @@ mkFastMarkup (filter (not . T.null . fst) -> tas) =
   let (_, as) = unzip tas
       as_list = Set.toList (Set.fromList as)
       as_map = Map.fromAscList (zip as_list [0 ..])
-      tps = V.fromList [Entry t (textWidth t) i | (t, a) <- tas, let i = as_map Map.! a]
+      tps = V.fromList
+        [ Entry t (textWidth t) i | (t, a) <- tas, let i = as_map Map.! a ]
   in FastMarkup tps (V.fromList as_list)
+
+fmWrap :: GetAttr a => FastMarkup a -> Widget n
+fmWrap = fmWrapWith defaultWrapSettings
 
 -- | FastMarkup analog of txtWrapWith
 fmWrapWith :: GetAttr a => WrapSettings -> FastMarkup a -> Widget n
@@ -55,9 +61,9 @@ fmWrapWith settings (FastMarkup tis as) =
     let theLines = wrapLines settings (c ^. Brick.availWidthL) tis
         horizCat' = Vty.horizCat . V.toList
           . V.map (\(Entry t _ i :: Entry 'NE) ->
-                     -- When your Haskell code looks like C code :(
-                     let attr_i = if i == -1 then Vty.defAttr else attrs V.! i in
-                     Vty.text' attr_i t
+                     -- TFW your Haskell code looks like C code :(
+                     let attr_i = if i == -1 then Vty.defAttr else attrs V.! i
+                     in Vty.text' attr_i t
                   )
     pure $ case V.length theLines of
       0 -> Brick.emptyResult

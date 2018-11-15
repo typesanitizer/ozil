@@ -28,6 +28,7 @@ import Help.Page.Man
 import Help.Page.Help
 
 import Brick hiding (txt, render)
+import Brick.FastMarkup (mkFastMarkup, fmWrap)
 
 import Brick.Markup (markup, Markup)
 import Data.Monoid (Sum(..))
@@ -110,10 +111,10 @@ renderManPage (ManPage (ManPageView h secs _) _) =
     renderHeading = const emptyWidget
     each f = V.toList . V.map f
     renderSection (sh, chnks) = vBox
-      [renderSectionHeading sh, markup (mconcat (each renderChunk chnks))]
+      [renderSectionHeading sh, fmWrap $ mkFastMarkup
+        $ V.toList $ fmap ((,"subc-link" :: AttrName) . renderChunk) chnks]
     renderSectionHeading = Brick.txt
-    renderChunk :: Chunk -> Markup AttrName
-    renderChunk (Chunk txt _) = fromText txt
+    renderChunk (Chunk txt _) = txt
 
 renderHelpPage :: LinkState -> HelpPage -> Widget n
 renderHelpPage ls HelpPage{_helpPageBody = v, _helpPageAnchors = a} =
