@@ -77,6 +77,7 @@ library
       Brick.Widgets.GDialog
       Commons
       Control.Lens.Extra
+      Data.Focused
       Data.Pair
       Help.Ozil.App
           Help.Ozil.App.Cmd

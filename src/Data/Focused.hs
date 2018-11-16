@@ -7,6 +7,7 @@ module Data.Focused
   , push
   , clipPush
   , clipPushBy
+  , focus
   ) where
 
 import Data.List.NonEmpty (NonEmpty (..))
@@ -37,6 +38,9 @@ tryPop fc = maybe fc snd (pop fc)
 
 push :: a -> Focused a -> Focused a
 push x (Focused xs y zs) = Focused (y:xs) x zs
+
+focus :: Focused a -> a
+focus (Focused _ x _) = x
 
 -- | Move the focus if the entry matches the next entry.
 -- Otherwise, drop the tail and push the given entry.

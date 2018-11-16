@@ -25,6 +25,7 @@ module Commons
   , headMaybe
   , inBounds
   , pattern KeyPress
+  , pattern KeyPress'
   , Optional
   , (===)
   , (|||)
@@ -79,6 +80,9 @@ inBounds mn v mx = max mn (min v mx)
 
 pattern KeyPress :: Vty.Key -> Brick.BrickEvent n e
 pattern KeyPress k = Brick.VtyEvent (Vty.EvKey k [])
+
+pattern KeyPress' :: Vty.Key -> [Vty.Modifier] -> Brick.BrickEvent n e
+pattern KeyPress' k mods = Brick.VtyEvent (Vty.EvKey k mods)
 
 type Optional = Maybe Text
 
