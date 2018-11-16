@@ -11,14 +11,14 @@ import Commons
 
 import Help.Ozil.App.Death (unreachableError)
 
-import Control.Lens (makeLenses)
 import Control.Monad.State.Strict
 import Data.Char (isAlphaNum, isUpper)
 import Data.List.Split (chop)
+import Lens.Micro.TH (makeLenses)
+import Lens.Micro.Type (SimpleGetter)
 import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 
-import qualified Control.Lens as L
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import qualified Data.Vector.Generic as V
@@ -184,7 +184,7 @@ twoColumn
   => TableType                               -- ^ Item constructor
   -> m Text                                  -- ^ Item parser
   -> (IndentGuess -> NonEmpty (Maybe Int))   -- ^ Item alignments
-  -> L.Getter IndentGuess (Maybe ItemIndent) -- ^ Getter for description indent
+  -> SimpleGetter IndentGuess (Maybe ItemIndent)   -- ^ Getter for description indent
   -> (Int -> Int -> IndentGuess -> m ())     -- ^ Save state at the end.
   -> m Item
 twoColumn tt itemP itmIndentsIn lx saveIndents = do

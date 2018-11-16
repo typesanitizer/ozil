@@ -2,12 +2,11 @@
 
 module Help.Ozil.App.Config.Types where
 
-import Data.Set (Set)
-import Data.Text (Text)
+import Commons
 
-import Control.Lens (Lens')
-import Control.Lens.TH (makeLenses)
 import Data.Aeson.TH (deriveJSON, defaultOptions, Options (..))
+import Lens.Micro (Lens')
+import Lens.Micro.TH (makeLenses)
 
 data SystemInfo = SystemInfo
   { _ozilConfigFileExists :: !(Maybe FilePath)

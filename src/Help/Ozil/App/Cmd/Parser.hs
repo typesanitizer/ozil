@@ -2,6 +2,8 @@ module Help.Ozil.App.Cmd.Parser
   ( defaultMain
   ) where
 
+import Commons
+
 import Help.Ozil.App.Cmd.Types
 
 import Options.Applicative
@@ -9,7 +11,6 @@ import Options.Applicative
 import System.FilePath (isPathSeparator, takeExtension)
 import Text.Printf (printf)
 
-import qualified Control.Lens as L
 import qualified Help.Ozil.App.Default as Default
 
 -- | Top-level runner
@@ -105,7 +106,7 @@ defaultOptionsP =
     ext      = takeExtension s
     filetype = case ext of
       "" -> Binary
-      _  -> ManPage (L.view zipped (ext == ".gz"))
+      _  -> ManPage (coerce (ext == ".gz"))
 
 -- TODO: Briefly explain syntax of POSIX regexes and give usage examples.
 -- Also, add link to canonical resources on POSIX regexes (both online and

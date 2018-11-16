@@ -7,8 +7,8 @@ import Help.Page
 import Help.Page.Help
 import Help.Page.Man
 
-import Control.Lens.TH (makeFields)
 import Data.Text (Text)
+import Lens.Micro.TH (makeFields)
 
 makeFields ''HelpPage
 makeFields ''Heading

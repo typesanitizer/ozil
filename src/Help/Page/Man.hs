@@ -26,7 +26,6 @@ import Data.Either (fromRight)
 import Data.HashSet (HashSet)
 import Data.List.Split (chop)
 
-import qualified Control.Lens as L
 import qualified Data.Text as T
 import qualified Data.HashSet as Set
 import qualified Data.Vector.Generic as V
@@ -149,7 +148,8 @@ parseManPage t =
     inp = T.lines t
     (rets, PS ps) =
       flip runState (PS [])
-      $ L.itraverse (\i line -> runParserT (manPageLineP i) "" line) inp
+      $ traverse (\(i, line) -> runParserT (manPageLineP i) "" line)
+      $ zip [0..] inp
     errmsg i v = printf "man page line %d parse error " i ++ show v
     -- TODO: Too many partial functions and incomplete matches here :(
     (tmp', tmp) = break isHeading

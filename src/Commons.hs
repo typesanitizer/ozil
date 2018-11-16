@@ -3,8 +3,6 @@
 module Commons
   ( module Control.DeepSeq
   , module Control.Exception
-  , module Control.Lens
-  , module Control.Lens.TH
   , module Control.Monad
   , module Control.Monad.IO.Class
   , module Data.Coerce
@@ -12,12 +10,16 @@ module Commons
   , module Data.List.NonEmpty
   , module Data.Maybe
   , module Data.Pair
+  , module Data.Set
   , module Data.Text
   , module Data.Vector
   , UVector
   , module Data.Void
   , module GHC.Generics
   , module GHC.Stack
+  , module Lens.Micro
+  , module Lens.Micro.Mtl
+  , module Lens.Micro.TH
   , module Text.Printf
   , readProcessSimple
   , headMaybe
@@ -33,8 +35,9 @@ module Commons
 
 import Control.DeepSeq (force, NFData(..))
 import Control.Exception (assert)
-import Control.Lens ((^.), (^?), (<&>), view, set, over, _1, _2)
-import Control.Lens.TH (makeFields)
+import Lens.Micro ((^.), (^?), (<&>), set, over, _1, _2)
+import Lens.Micro.Mtl (view)
+import Lens.Micro.TH (makeFields)
 import Control.Monad (when, void, join, forM, forM_)
 import Control.Monad.IO.Class
 import Data.Coerce
@@ -42,6 +45,7 @@ import Data.Function ((&), on)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe
 import Data.Pair
+import Data.Set (Set)
 import Data.Text (Text, pack, unpack)
 import Data.Vector (Vector)
 import qualified Data.Vector.Unboxed

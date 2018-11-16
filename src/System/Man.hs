@@ -2,8 +2,9 @@
 
 module System.Man where
 
+import Commons
+
 import Control.Exception (try)
-import Control.Lens ((<&>))
 import Data.List (union)
 import Data.String (IsString)
 import System.Environment (getEnv)
@@ -13,12 +14,12 @@ import System.Man.Types
 
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import qualified Data.Vector as V
+import qualified Data.Vector.Generic as V
 
 defaultManPath :: IsString a => a
 defaultManPath = "/usr/share/man"
 
-manPath :: IO (V.Vector T.Text)
+manPath :: IO (Vector Text)
 manPath = do
   envPaths <- T.split (== ':') . T.pack <$> getEnv "MANPATH"
   -- NOTE: The order of arguments in union is important, duplicates are
@@ -28,7 +29,7 @@ manPath = do
 manpathConfigPath :: IsString a => a
 manpathConfigPath = "/etc/manpath.config"
 
-manpathConfigText :: IO (Maybe T.Text)
+manpathConfigText :: IO (Maybe Text)
 manpathConfigText =
   try (T.readFile manpathConfigPath) <&> \case
     Right txt -> Just txt

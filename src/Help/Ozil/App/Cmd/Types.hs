@@ -7,8 +7,7 @@ module Help.Ozil.App.Cmd.Types
 
 import Commons
 
-import Control.Lens (Iso', iso)
-import Control.Lens.TH (makePrisms)
+import Lens.Micro (Traversal')
 
 data ConfigOptions
   = ConfigInit   -- ^ Initialize a config file.
@@ -29,13 +28,19 @@ data DbOptions
   | DbReInit
   deriving Show
 
-data Zipped = Unzipped | Zipped
-  deriving Show
+newtype Zipped = MkZipped Bool
 
-zipped :: Iso' Bool Zipped
-zipped = iso
-  (\case False -> Unzipped; True -> Zipped)
-  (\case Unzipped -> False; Zipped -> True)
+{-# COMPLETE Unzipped, Zipped #-}
+pattern Unzipped :: Zipped
+pattern Unzipped = MkZipped False
+
+pattern Zipped :: Zipped
+pattern Zipped = MkZipped True
+
+instance Show Zipped where
+  show = \case
+    Unzipped -> "Unzipped"
+    Zipped -> "Zipped"
 
 data InputFileType
   = Binary
@@ -79,6 +84,15 @@ data Command
   -- | Db !DbOptions
   deriving Show
 
+-- | A "Prism" to check if the value is _Default.
+--
+-- microlens doesn't have Prisms so we make do with Traversal'.
+_Default :: Traversal' Command DefaultOptions
+_Default f cmd = case cmd of
+  Config _  -> pure cmd
+  Default dopt -> Default <$> f dopt
+  WhatIs _  -> pure cmd
+
 -- | Command line options
 data Options = Options
   { _optionsConfigPath :: !(Maybe FilePath)
@@ -88,5 +102,4 @@ data Options = Options
 makeFields ''InputFile
 makeFields ''DefaultOptions
 makeFields ''WhatIsOptions
-makePrisms ''Command
 makeFields ''Options

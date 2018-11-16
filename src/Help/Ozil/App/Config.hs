@@ -20,9 +20,7 @@ import System.Directory
 import Data.Yaml (prettyPrintParseException, decodeFileEither, encode)
 import System.Exit (exitSuccess)
 import System.FilePath (takeDirectory)
-import Text.Printf (printf)
 
-import qualified Control.Lens as L
 import qualified Data.Text as T
 import qualified Data.ByteString as BS
 import qualified Help.Ozil.App.Config.Types as Conf
@@ -53,7 +51,7 @@ foundConfigFile = do
       True  -> p
       False -> errConfigFileMissing x
   modifyConfig (set Conf.configFileExists cfe)
-  pure (view exists (isJust cfe))
+  pure (coerce (isJust cfe))
   where
     errConfigFileMissing :: FilePath -> a
     errConfigFileMissing x = error
@@ -64,12 +62,12 @@ effectiveConfigPath :: Startup FilePath
 effectiveConfigPath =
   fromMaybe Default.configPath <$> view (options . configPath)
 
-data OzilFileExists = OzilFileMissing | OzilFileExists
+newtype OzilFileExists = MkOzilFileExists Bool
 
-exists :: L.Iso' Bool OzilFileExists
-exists = L.iso
-  (\case False -> OzilFileMissing; True -> OzilFileExists)
-  (\case OzilFileMissing -> False; OzilFileExists -> True)
+{-# COMPLETE OzilFileExists, OzilFileMissing #-}
+pattern OzilFileMissing, OzilFileExists :: OzilFileExists
+pattern OzilFileMissing = MkOzilFileExists False
+pattern OzilFileExists  = MkOzilFileExists True
 
 deleteConfigFileIfApplicable :: OzilFileExists -> Startup OzilFileExists
 deleteConfigFileIfApplicable ozilFileExists = view optCommand >>= \case
@@ -80,7 +78,7 @@ deleteConfigFileIfApplicable ozilFileExists = view optCommand >>= \case
   WhatIs _            -> pure ozilFileExists
   Default _           -> pure ozilFileExists
  where
-  delete = when (ozilFileExists ^. L.from exists) $ do
+  delete = when (coerce ozilFileExists) $ do
     liftIO $ removePathForcibly Default.configPath
     modifyConfig (set Conf.configFileExists Nothing)
 
@@ -98,7 +96,7 @@ createConfigFileIfApplicable ozilFileExists = view optCommand >>= \case
     OzilFileMissing -> do
       create <- liftIO $ prompt DefaultYes promptMsg
       when create (initAction unreachableError)
-      pure (create ^. exists)
+      pure (coerce create)
   promptMsg = "Configuration file not found. Should I initialize one?"
   initAction :: (forall a. Startup a) -> Startup ()
   initAction death = case ozilFileExists of

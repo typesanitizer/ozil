@@ -29,7 +29,6 @@ import qualified Brick
 import qualified Brick.Widgets.Core as W
 import qualified Brick.Widgets.Dialog as W
 import qualified Brick.Widgets.GDialog as W
-import qualified Control.Lens as L
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
@@ -80,7 +79,7 @@ savePreferredCandidate _ = id
 
 getManPageSummaries :: HasCallStack => Startup [ManPageSummary]
 getManPageSummaries = do
-  cmd <- L.view optCommand
+  cmd <- view optCommand
   case cmd ^? _Default.inputs of
     Nothing -> pure mempty
     Just InputPath{} -> unimplementedErrorM
@@ -106,7 +105,7 @@ getManPageSummaries = do
 -- may give different results.
 getHelpPageSummaries :: HasCallStack => Startup [HelpPageSummary]
 getHelpPageSummaries = do
-  cmd <- L.view optCommand
+  cmd <- view optCommand
   check (cmd ^? _Default.inputs) $ \case
     InputPath{} -> unimplementedErrorM
     InputFile ManPage{} _ -> pure []

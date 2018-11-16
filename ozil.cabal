@@ -57,8 +57,10 @@ library
     , filepath
     , fsnotify
     , hashable
-    , lens
     , megaparsec < 7
+    , microlens
+    , microlens-mtl
+    , microlens-th
     , mtl
     , optparse-applicative
     , process
