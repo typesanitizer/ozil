@@ -1,0 +1,148 @@
+cabal-version: 1.12
+
+name:           ozil
+version:        0.0.1.0
+description:    Please see the Readme on Github at <https://github.com/theindigamer/ozil#readme>
+homepage:       https://github.com/theindigamer/ozil#readme
+bug-reports:    https://github.com/theindigamer/ozil/issues
+author:         Varun Gandhi
+maintainer:     theindigamer15@gmail.com
+copyright:      2018 Varun Gandhi
+license:        BSD3
+build-type:     Simple
+extra-source-files:
+    Readme.md
+    ChangeLog.md
+
+source-repository head
+  type: git
+  location: https://github.com/theindigamer/ozil
+
+library
+  hs-source-dirs: src
+  default-language: Haskell2010
+  default-extensions: DeriveGeneric
+                      DeriveDataTypeable
+                      DeriveFunctor
+                      DeriveFoldable
+                      DeriveTraversable
+                      StandaloneDeriving
+                      FlexibleInstances
+                      FlexibleContexts
+                      MultiParamTypeClasses
+                      FunctionalDependencies
+                      BangPatterns
+                      LambdaCase
+                      NamedFieldPuns
+                      OverloadedStrings
+                      TupleSections
+                      PatternSynonyms
+  ghc-options: -Wall
+               -Wcompat
+               -Wnoncanonical-monad-instances
+               -Wnoncanonical-monadfail-instances
+               -Wnoncanonical-monoid-instances
+               -Wredundant-constraints
+               -Wno-type-defaults
+               -funbox-strict-fields
+  build-depends:
+      aeson
+    , base
+    , brick      >= 0.37.2
+    , bytestring
+    , containers
+    , deepseq
+    , directory
+    , extra
+    , filepath
+    , fsnotify
+    , hashable
+    , lens
+    , megaparsec < 7
+    , mtl
+    , optparse-applicative
+    , process
+    , split
+    , text
+    , unordered-containers
+    , vector
+    , vty
+    , word-wrap
+    , yaml
+    , zlib
+  exposed-modules:
+      Brick.FastMarkup
+      Brick.Widgets.GDialog
+      Commons
+      Control.Lens.Extra
+      Data.Pair
+      Help.Ozil.App
+          Help.Ozil.App.Cmd
+              Help.Ozil.App.Cmd.Parser
+              Help.Ozil.App.Cmd.Types
+          Help.Ozil.App.Config
+              Help.Ozil.App.Config.Types
+              Help.Ozil.App.Config.Watch
+          Help.Ozil.App.Console.Text
+          Help.Ozil.App.Core
+          Help.Ozil.App.Death
+          Help.Ozil.App.Default
+          Help.Ozil.App.Startup
+              Help.Ozil.App.Startup.Core
+      Help.Page
+          Help.Page.Help
+          Help.Page.Lenses
+          Help.Page.Man
+      System.Man
+          System.Man.Parser
+          System.Man.Types
+
+executable ozil
+  main-is: ozil.hs
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends: base, ozil
+  default-language: Haskell2010
+
+test-suite ozil-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  hs-source-dirs: test
+  default-extensions: FlexibleInstances
+                      FlexibleContexts
+                      MultiParamTypeClasses
+                      FunctionalDependencies
+                      BangPatterns
+                      LambdaCase
+                      NamedFieldPuns
+                      OverloadedStrings
+                      TupleSections
+                      PatternSynonyms
+  ghc-options: -Wall
+               -Wcompat
+               -Wnoncanonical-monad-instances
+               -Wnoncanonical-monadfail-instances
+               -Wnoncanonical-monoid-instances
+               -Wredundant-constraints
+               -Wno-type-defaults
+               -funbox-strict-fields
+               -threaded
+               -rtsopts
+               -with-rtsopts=-N
+  build-depends:
+      base
+    , ozil
+    -- transitive
+    , brick
+    , word-wrap
+    , text
+    , vector
+    -- testing specific stuff
+    , hedgehog
+    , hspec
+    , tasty
+    , tasty-discover
+    , tasty-hedgehog
+    , tasty-hspec
+  other-modules:
+      Brick.FastMarkupSpec
+  default-language: Haskell2010

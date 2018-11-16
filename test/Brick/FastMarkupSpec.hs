@@ -9,9 +9,9 @@ import Hedgehog
 import Test.Hspec
 
 import Brick (textWidth)
-import Text.Wrap (WrapSettings (..))
 import Data.Foldable (foldlM, toList)
 import Data.List.NonEmpty (NonEmpty (..))
+import Text.Wrap (WrapSettings (..))
 
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T

@@ -1,4 +1,4 @@
-# ozil - A man with intelligence and vision
+# ozil - A man with intelligence and vision [![Build Status](https://travis-ci.com/theindigamer/ozil.svg?token=atg5zCeDiWzbYpJit3Kx&branch=master)](https://travis-ci.com/theindigamer/ozil)
 
 `ozil` assists you with viewing man/help pages. It is intended as a
 porcelain for `man`/`--help` + `less`/`more`/`most`.
