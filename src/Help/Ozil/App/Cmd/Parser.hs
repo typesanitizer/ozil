@@ -85,8 +85,8 @@ defaultOptionsP =
                \then ozil will automatically check project binaries for \
                \matches."
           )
-    <*> ( toInputFile <$> strArgument
-          (  metavar "<file>"
+    <*> ( toCmdInput <$> strArgument
+          (  metavar "<command>"
           <> help
              "Input: can be a binary name (e.g. gcc), or a man page \
              \(e.g. gcc.1 or gcc.1.gz) or a path (e.g. foo/a.out)."
@@ -98,6 +98,11 @@ defaultOptionsP =
           )
  where
   offSwitch = fmap not . switch
+  -- I think it is safe to assume that the quotes are balanced :), otherwise
+  -- the shell wouldn't let the input through, so using init is justified.
+  toCmdInput s = case words s of
+    [] -> error "Error: Empty input. What do you want me to do? :("
+    w:ws -> CmdInput (toInputFile w) ws
   toInputFile s =
     if any isPathSeparator s
       then InputPath filetype s

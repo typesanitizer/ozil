@@ -6,7 +6,7 @@ module Help.Ozil.App.Startup
 
 import Commons
 
-import Help.Page
+import Help.Page hiding (subcommandPath)
 import Help.Ozil.App.Cmd
 import Help.Ozil.App.Death
 import Help.Ozil.App.Startup.Core
@@ -16,13 +16,13 @@ import Help.Ozil.App.Config (getConfig, Config)
 
 import qualified Help.Ozil.App.Default as Default
 
+import System.FilePath
+
 import Brick (App (..))
 import Codec.Compression.GZip (decompress)
 import Data.List.Extra (trim)
+import Lens.Micro ((^?!))
 import System.Exit (ExitCode (..))
-import System.FilePath
-  ( (</>), splitDirectories, splitDrive, splitFileName, takeExtension
-  , dropExtension)
 import System.Process (readProcess, readProcessWithExitCode)
 
 import qualified Brick
@@ -80,13 +80,13 @@ savePreferredCandidate _ = id
 getManPageSummaries :: HasCallStack => Startup [ManPageSummary]
 getManPageSummaries = do
   cmd <- view optCommand
-  case cmd ^? _Default.inputs of
+  case cmd ^? _Default.inputs.primary of
     Nothing -> pure mempty
-    Just InputPath{} -> unimplementedErrorM
+    Just InputPath{}   -> unimplementedErrorM
     Just p@InputFile{} ->
       liftIO $ do
       -- FIXME: whatis may not recognize everything (if mandb hasn't been run
-      -- recently), so we might actually need to run man as well
+      -- recently), so we might actually need to run man as well.
       (ecode, out, _) <- readProcessWithExitCode "whatis" ["-w", go p] ""
       pure $ case ecode of
         ExitFailure _ -> []
@@ -106,21 +106,24 @@ getManPageSummaries = do
 getHelpPageSummaries :: HasCallStack => Startup [HelpPageSummary]
 getHelpPageSummaries = do
   cmd <- view optCommand
-  check (cmd ^? _Default.inputs) $ \case
+  check (cmd ^? _Default.inputs.primary) $ \case
     InputPath{} -> unimplementedErrorM
-    InputFile ManPage{} _ -> pure []
+    InputFile i@ManPage{} _ -> liftIO (print i) >> pure []
     InputFile Binary nm -> liftIO $ do
       -- FIXME: Calling 'which' is not portable.
       -- https://unix.stackexchange.com/q/85249/89474
       -- However, 'command' might be a shell built-in, and I'm not sure how to
-      -- use the API in System.Process to call shell commands and capture stdout
+      -- use the API in System.Process to call shell commands and capture stdout.
+      liftIO (print cmd)
       binpaths <- readProcessSimple "which" [nm]
       check binpaths $ \txt ->
         fmap catMaybes . forM (T.lines txt) $ \path -> do
-          let path' = unpack path
-              tryGettingHelp f b = do
-                h <- f path'
-                pure (HelpPageSummary path' b <$> (headMaybe =<< fmap T.lines h))
+          let rest = cmd ^?! _Default.inputs.subcommandPath
+              path' = unpack path -- <> rest
+              tryGettingHelp getHelp b = do
+                h <- getHelp path' rest
+                pure (HelpPageSummary path' rest b
+                      <$> (headMaybe =<< fmap T.lines h))
           tryGettingHelp getShortHelp True >>= \case
             Nothing -> tryGettingHelp getLongHelp False
             Just h  -> pure (Just h)
@@ -149,18 +152,18 @@ getManPage (UnknownFormat _) =
   -- TODO: Error handling
   error "Error: Unexpected format for man page summary."
 
-getShortHelp :: FilePath -> IO (Maybe Text)
-getShortHelp p = readProcessSimple p ["-h"]
+getShortHelp :: FilePath -> [String] -> IO (Maybe Text)
+getShortHelp binPath subcPath = readProcessSimple binPath (subcPath <> ["-h"])
 
-getLongHelp :: FilePath -> IO (Maybe Text)
-getLongHelp p = readProcessSimple p ["--help"]
+getLongHelp :: FilePath -> [String] -> IO (Maybe Text)
+getLongHelp binPath subcPath = readProcessSimple binPath (subcPath <> ["--help"])
 
 getHelpPage :: HasCallStack => HelpPageSummary -> IO DocPage
-getHelpPage (HelpPageSummary binpath short _) =
+getHelpPage (HelpPageSummary binPath subcPath short _) =
   let (parse, get) = if short
         then (ShortHelp . parseShortHelp, getShortHelp)
         else (LongHelp . parseLongHelp, getLongHelp)
-  in parse . fromJust' <$> get binpath
+  in parse . fromJust' <$> get binPath subcPath
 
 --------------------------------------------------------------------------------
 -- * Selection process
@@ -259,8 +262,8 @@ saveSelectionAppHandleEvent s = \case
 
 summaryButtonStr :: DocPageSummary -> String
 summaryButtonStr = \case
-  HelpSummary (HelpPageSummary p sh _) ->
-    abbrev p ++ if sh then " -h" else " --help"
+  HelpSummary (HelpPageSummary bp scp sh _) ->
+    abbrev bp <> " " <> unwords scp <> if sh then " -h" else " --help"
     where abbrev (splitFileName -> (ds, fn)) =
             let (dr, splitDirectories -> dirs) = splitDrive ds
                 middir = maybe ".." (</> "..") (headMaybe dirs)

@@ -55,6 +55,7 @@ parseManPageSummary s =
 -- FIXME: Erm, these record field names don't make sense. Available and Text?
 data HelpPageSummary = HelpPageSummary
   { binaryPath         :: FilePath
+  , subcommandPath     :: [String]
   , shortHelpAvailable :: !Bool
   , shortHelpText      :: Text
   }

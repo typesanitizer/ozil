@@ -60,9 +60,19 @@ data InputFile
     }
   deriving Show
 
+-- | Unit corresponding to one help/man "item".
+--
+-- For example, if one types @ozil 'rustup override set'@ then, primary
+-- would correspond to @rustup@ and subcommandPath would be
+-- @["override", "set"]@.
+data CmdInput = CmdInput
+  { _cmdInputPrimary        :: !InputFile
+  , _cmdInputSubcommandPath :: [String]
+  } deriving Show
+
 data DefaultOptions = DefaultOptions
   { _defaultOptionsAutofind  :: !Bool
-  , _defaultOptionsInputs    :: !InputFile
+  , _defaultOptionsInputs    :: !CmdInput
   , _defaultOptionsDebugMode :: !Bool
   } deriving Show
 
@@ -100,6 +110,7 @@ data Options = Options
   } deriving Show
 
 makeFields ''InputFile
+makeFields ''CmdInput
 makeFields ''DefaultOptions
 makeFields ''WhatIsOptions
 makeFields ''Options

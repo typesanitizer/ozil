@@ -10,11 +10,13 @@ module Help.Ozil.App.Config
 
 import Commons
 
-import Help.Ozil.App.Cmd (configPath, optCommand, Command (..), ConfigOptions (..))
 import Help.Ozil.App.Config.Watch
+import Help.Ozil.App.Death
+
+import Help.Ozil.App.Cmd (configPath, optCommand, Command (..), ConfigOptions (..))
 import Help.Ozil.App.Console.Text (warn, prompt, pattern DefaultYes)
-import Help.Ozil.App.Death (unimplementedErrorM, unreachableError, unreachableErrorM, oDie)
 import Help.Ozil.App.Startup.Core (options, modifyConfig, Startup)
+
 import System.Directory
 
 import Data.Yaml (prettyPrintParseException, decodeFileEither, encode)
