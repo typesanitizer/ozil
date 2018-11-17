@@ -15,8 +15,6 @@ porcelain for `man`/`--help` + `less`/`more`/`most`.
   - TODO: insert GIF
 - [ ] Simple but flexible configuration with hot-reloading by default.
   - TODO: insert GIF
-- [ ] Option to highlight information for later use.
-  - TODO: insert GIF
 
 ## Platforms
 
@@ -47,7 +45,13 @@ as well :smile:.
 
 ## Contributing
 
+See [Contributing.md]().
+
 ## Thanks
+
+Special thanks to the Brick maintainer @jtdaugherty for making such as easy to
+use and well-documented TUI library. Writing `ozil` wouldn't have been possible
+without it :smile:.
 
 ## Miscellaneous
 

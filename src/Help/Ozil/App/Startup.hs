@@ -112,18 +112,12 @@ getHelpPageSummaries = do
       -- However, 'command' might be a shell built-in, and I'm not sure how to
       -- use the API in System.Process to call shell commands and capture stdout.
       liftIO (print cmd)
-      binpaths <- readProcessSimple "which" [nm]
-      check binpaths $ \txt ->
+      sys_binpaths <- readProcessSimple "which" [nm]
+      check sys_binpaths $ \txt ->
         fmap catMaybes . forM (T.lines txt) $ \path -> do
           let rest = cmd ^?! _Default.inputs.subcommandPath
               path' = unpack path -- <> rest
-              tryGettingHelp getHelp b = do
-                h <- getHelp path' rest
-                pure (HelpPageSummary path' rest b
-                      <$> (headMaybe =<< fmap T.lines h))
-          tryGettingHelp getShortHelp True >>= \case
-            Nothing -> tryGettingHelp getLongHelp False
-            Just h  -> pure (Just h)
+          getHelpPageSummary (Simple path') rest
   where
     check x f = case x of Nothing -> pure []; Just z -> f z
 
@@ -224,12 +218,7 @@ saveSelectionAppHandleEvent s = \case
 
 summaryButtonStr :: DocPageSummary -> String
 summaryButtonStr = \case
-  HelpSummary (HelpPageSummary bp scp sh _) ->
-    abbrev bp <> " " <> unwords (map show scp) <> if sh then " -h" else " --help"
-    where abbrev (splitFileName -> (ds, fn)) =
-            let (dr, splitDirectories -> dirs) = splitDrive ds
-                middir = maybe ".." (</> "..") (headMaybe dirs)
-            in dr </> middir </> fn
+  HelpSummary h -> displayHelpPageSummary h
   ManSummary (UnknownFormat s) -> s
   ManSummary (WhatisDescr w) ->
     let s1 = printf "%s(%s)" (w ^. name) (w ^. section) :: String

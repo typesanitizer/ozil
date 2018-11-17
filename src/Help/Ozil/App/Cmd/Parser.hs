@@ -21,7 +21,7 @@ defaultMain run = execParser opts >>= run
   opts = info
     (helper <*> options)
     (  fullDesc
-    <> header "ozil - Frictionless browsing of man/help pages."
+    <> header "ozil - Browsing man pages and help pages with zero friction."
     <> progDesc
          "ozil assists you with viewing man/help pages. \
          \It is intended as a replacement for man/--help + \

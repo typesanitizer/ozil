@@ -23,11 +23,21 @@ data ManPageSummary
 
 -- FIXME: Erm, these record field names don't make sense. Available and Text?
 data HelpPageSummary = HelpPageSummary
-  { _binaryPath         :: FilePath
+  { _binaryPath         :: BinaryPath
   , _subcommandPath     :: [Subcommand]
   , _shortHelpAvailable :: !Bool
   , _shortHelpText      :: Text
   } deriving Eq
+
+data BinaryPath
+  = Simple FilePath
+  | Local BuildSystem BinName
+  deriving Eq
+
+data BuildSystem = Stack | Cabal | Cargo
+  deriving Eq
+
+type BinName = String
 
 data DocPageSummary
   = ManSummary  !ManPageSummary

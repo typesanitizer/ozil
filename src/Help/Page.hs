@@ -1,3 +1,5 @@
+{-# LANGUAGE ViewPatterns #-}
+
 module Help.Page
   ( DocPage (..)
   , parseHelpPage
@@ -6,6 +8,8 @@ module Help.Page
   , ManPageSummary (..)
   , parseManPageSummary
   , HelpPageSummary (..)
+  , displayHelpPageSummary
+  , BinaryPath (Simple)
 
   , LinkState
   , mkLinkStateOff
@@ -17,8 +21,7 @@ module Help.Page
   , getNewSubcommand
 
   , getDocPage
-  , getLongHelp
-  , getShortHelp
+  , getHelpPageSummary
 
   , render
   )
@@ -40,7 +43,8 @@ import Brick.FastMarkup (fmWrap)
 import Codec.Compression.GZip (decompress)
 import Data.List.Extra (trim)
 import Data.Monoid (Sum(..))
-import System.FilePath (takeExtension)
+import System.FilePath
+  ((</>), splitDrive, splitDirectories, splitFileName, takeExtension)
 import System.Process (readProcess)
 import Text.Wrap (WrapSettings (..))
 
@@ -56,6 +60,22 @@ import qualified Data.Vector.Generic as V
 parseManPageSummary :: String -> ManPageSummary
 parseManPageSummary s =
   maybe (UnknownFormat s) WhatisDescr (parseWhatisDescription s)
+
+--------------------------------------------------------------------------------
+-- * Display
+
+displayHelpPageSummary :: HelpPageSummary -> String
+displayHelpPageSummary (HelpPageSummary bp scp sh _) =
+  case bp of
+    Simple p -> unwords (abbrev p : map show scp <> [hstr])
+      where abbrev (splitFileName -> (ds, fn)) =
+              let (dr, splitDirectories -> dirs) = splitDrive ds
+                  middir = maybe ".." (</> "..") (headMaybe dirs)
+              in dr </> middir </> fn
+    Local{} -> (\(exe, rest) -> unwords (exe : rest <> [hstr]))
+      $ mkProcessArgs bp scp
+  where
+    hstr = if sh then "-h" else "--help"
 
 --------------------------------------------------------------------------------
 -- * Working with LinkState
@@ -122,18 +142,31 @@ getManPage (UnknownFormat _) =
   -- TODO: Error handling
   error "Error: Unexpected format for man page summary."
 
-getShortHelp :: FilePath -> [Subcommand] -> IO (Maybe Text)
-getShortHelp binPath subcPath
-  = readProcessSimple binPath (map show subcPath <> ["-h"])
+mkProcessArgs :: BinaryPath -> [Subcommand] -> (String, [String])
+mkProcessArgs bp subcs = case bp of
+  Simple fp -> (fp, map show subcs)
+  Local bs bin -> case bs of
+    Stack -> ("stack", ["exec", bin, "--"])
+    Cabal -> ("cabal", ["v2-exec", bin, "--"])
+    Cargo -> ("cargo", ["run", bin, "--"])
 
-getLongHelp :: FilePath -> [Subcommand] -> IO (Maybe Text)
-getLongHelp binPath subcPath
-  = readProcessSimple binPath (map show subcPath <> ["--help"])
+getHelpPageSummary :: BinaryPath -> [Subcommand] -> IO (Maybe HelpPageSummary)
+getHelpPageSummary binPath subcPath = do
+  d1 <- go ["-h"]
+  d2 <- fmap (mkHPS False) <$> go ["--help"]
+  pure $ maybe d2 (Just . mkHPS True) d1
+  where
+    mkHPS = HelpPageSummary binPath subcPath
+    go hstr = uncurry readProcessSimple $ (<> hstr)
+      <$> mkProcessArgs binPath subcPath
 
 getHelpPage :: HasCallStack => HelpPageSummary -> IO (Maybe DocPage)
 getHelpPage hsum@(HelpPageSummary binPath subcPath short _) =
-  let get = if short then getShortHelp else getLongHelp
-  in fmap (Help hsum . parseHelpPage) <$> get binPath subcPath
+  let hstr = if short then ["-h"] else ["--help"]
+  in fmap (Help hsum . parseHelpPage) <$> go hstr
+  where
+    go hstr = uncurry readProcessSimple $ (<> hstr)
+      <$> mkProcessArgs binPath subcPath
 
 --------------------------------------------------------------------------------
 -- * Rendering

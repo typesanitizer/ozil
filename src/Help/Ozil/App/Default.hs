@@ -17,6 +17,7 @@ import System.IO.Unsafe (unsafePerformIO)
 -- (can you even do that?).
 configDir :: FilePath
 configDir = unsafePerformIO getHomeDirectory </> ".config" </> "ozil"
+{-# NOINLINE configDir #-}
 
 displayConfigDir :: IsString a => a
 displayConfigDir = "~/.config/ozil"
