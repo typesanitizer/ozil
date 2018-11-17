@@ -1,4 +1,5 @@
 {-# LANGUAGE RankNTypes      #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds -Wno-redundant-constraints #-}
 
 module Help.Ozil.App.Config
   ( getConfig
@@ -34,13 +35,13 @@ import qualified Help.Ozil.App.Default as Default
 -- implementations of previous functions, which is not reflected in the types.
 
 getConfig :: HasCallStack => Startup ()
-getConfig =
-  foundConfigFile
-    >>= deleteConfigFileIfApplicable
-    >>= createConfigFileIfApplicable
-    >>= readWriteConfig
-    >>  checkDbExists
-    >>= syncDbIfApplicable
+getConfig = pure () -- do
+  -- foundConfigFile
+  --   >>= deleteConfigFileIfApplicable
+  --   >>= createConfigFileIfApplicable
+  --   >>= readWriteConfig
+  --   >>  checkDbExists
+  --   >>= syncDbIfApplicable
 
 foundConfigFile :: Startup OzilFileExists
 foundConfigFile = do
@@ -114,9 +115,9 @@ createConfigFileIfApplicable ozilFileExists = view optCommand >>= \case
     = "Error: configuration file already exists. \
       \Maybe you wanted to use ozil config reinit?"
 
-readWriteConfig :: HasCallStack => OzilFileExists -> Startup ()
+readWriteConfig :: OzilFileExists -> Startup ()
 readWriteConfig = \case
-  OzilFileMissing -> error "TODO: Decide the appropriate behavior here."
+  OzilFileMissing -> pure ()
   OzilFileExists  -> view optCommand >>= \case
     Config ConfigSync   -> readConfig *> syncConfig *> liftIO exitSuccess
     Config ConfigReInit -> readConfig *> syncConfig *> liftIO exitSuccess

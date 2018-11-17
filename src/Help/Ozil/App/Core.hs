@@ -52,6 +52,7 @@ data OResource
 data OWatch
   = Uninitialized !WatchManager
   | Running       !(IO ()) -- ^ Action to stop the watch
+  | NoWatch
 
 data View = View { _viewDocPage :: !DocPage, _viewLinkState :: !LinkState }
 
@@ -105,7 +106,7 @@ getBChan = oStateChan
 
 newOState
   :: Options
-  -> WatchManager
+  -> Maybe WatchManager
   -> BChan OEvent
   -> DocPage
   -> Config
@@ -114,7 +115,7 @@ newOState opts wm ch dp cfg = OState
   { oStateOptions    = opts
   , _oStateConfig    = cfg
   , _oStateViews     = F.singleton (mkView dp)
-  , _oStateWatch     = Uninitialized wm
+  , _oStateWatch     = maybe NoWatch Uninitialized wm
   , oStateChan       = ch
   , _oStateHeading   = "binaryname"
   , _oStateDebugMode = fromMaybe False (opts ^? optCommand._Default.debugMode)

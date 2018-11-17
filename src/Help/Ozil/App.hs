@@ -24,9 +24,9 @@ import qualified System.FSNotify as FSNotify
 main :: IO ()
 main = defaultMain $ \opts -> do
   (dp, cfg) <- finishStartup opts
-  FSNotify.withManager $ \wm -> do
-    chan <- BChan.newBChan maxChanSize
-    saveConfig $ Brick.customMain gui (Just chan) oapp (newOState opts wm chan dp cfg)
+  -- FSNotify.withManager $ \wm -> do
+  chan <- BChan.newBChan maxChanSize
+  saveConfig $ Brick.customMain gui (Just chan) oapp (newOState opts Nothing chan dp cfg)
   where
     gui = Vty.mkVty Vty.defaultConfig
     maxChanSize = 20
@@ -47,6 +47,7 @@ oapp = Brick.App
 
 ozilStartEvent :: OState -> Brick.EventM OResource OState
 ozilStartEvent s = case s ^. watch of
+  NoWatch -> pure s
   Running _ -> pure s
   Uninitialized wm -> do
     sw <- liftIO $
@@ -90,6 +91,7 @@ handleEvent s = \case
       case s ^. watch of
         Running stopWatch -> liftIO stopWatch
         Uninitialized _ -> pure ()
+        NoWatch -> pure ()
       Brick.halt s
     halfHeight :: Char -> Brick.EventM OResource Int
     halfHeight c = do

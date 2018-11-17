@@ -111,7 +111,6 @@ getHelpPageSummaries = do
       -- https://unix.stackexchange.com/q/85249/89474
       -- However, 'command' might be a shell built-in, and I'm not sure how to
       -- use the API in System.Process to call shell commands and capture stdout.
-      liftIO (print cmd)
       sys_binpaths <- readProcessSimple "which" [nm]
       check sys_binpaths $ \txt ->
         fmap catMaybes . forM (T.lines txt) $ \path -> do

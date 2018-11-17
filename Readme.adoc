@@ -24,9 +24,10 @@ toc::[]
   ** TODO: insert GIF
 * [ ] Automatic detection of subcommand help pages.
   ** TODO: insert GIF
-* [ ] Simple but flexible configuration with hot-reloading by default.
-  ** TODO: insert GIF
-* [ ] Search text
+
+### Planned
+* [ ] Simple but flexible configuration with hot-reloading by default [WIP].
+* [ ] Search text.
 
 ## Platforms
 

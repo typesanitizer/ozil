@@ -141,7 +141,7 @@ options =
   configSubP = command
     "conf"
     ( info (Config <$> configOptionsP) . progDesc $ printf
-      "Tweak configuration [%s]. Currently, there is only \
+      "[WIP] Tweak configuration [%s]. Currently, there is only \
       \one configuration file [%s], but we may add a database in \
       \the future for faster lookup."
       (Default.displayConfigDir :: String)
