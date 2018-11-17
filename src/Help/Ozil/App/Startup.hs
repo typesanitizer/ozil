@@ -6,7 +6,7 @@ module Help.Ozil.App.Startup
 
 import Commons
 
-import Help.Page hiding (subcommandPath)
+import Help.Page
 import Help.Ozil.App.Cmd
 import Help.Ozil.App.Death
 import Help.Ozil.App.Startup.Core
@@ -19,11 +19,9 @@ import qualified Help.Ozil.App.Default as Default
 import System.FilePath
 
 import Brick (App (..))
-import Codec.Compression.GZip (decompress)
-import Data.List.Extra (trim)
 import Lens.Micro ((^?!))
 import System.Exit (ExitCode (..))
-import System.Process (readProcess, readProcessWithExitCode)
+import System.Process (readProcessWithExitCode)
 
 import qualified Brick
 import qualified Brick.Widgets.Core as W
@@ -31,9 +29,6 @@ import qualified Brick.Widgets.Dialog as W
 import qualified Brick.Widgets.GDialog as W
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
-import qualified Data.Text.Encoding as T
-import qualified Data.ByteString.Lazy as BS
 import qualified Graphics.Vty as Vty
 
 --------------------------------------------------------------------------------
@@ -49,11 +44,13 @@ finishStartup o = do
   (dps, cfg) <- runStartup o Default.config (getConfig >> getCandidates)
   case dps of
     []   -> error "Empty list"
-    [dp] -> (, cfg) <$> getDocPage dp
+    [dp] -> (, cfg) . fromMaybe err <$> getDocPage dp
     h:tl -> do
       (dp, ss) <- runSelectionApp (h:|tl)
-      (, save ss dp cfg) <$> getDocPage dp
+      (, save ss dp cfg) . fromMaybe err <$> getDocPage dp
   where
+    err = error "Error: Expected to find a documentation page but couldn't.\n\
+                \This seems impossible, so what went wrong :(."
     save ss = if coerce ss then savePreferredCandidate else flip const
 
 --------------------------------------------------------------------------------
@@ -129,41 +126,6 @@ getHelpPageSummaries = do
             Just h  -> pure (Just h)
   where
     check x f = case x of Nothing -> pure []; Just z -> f z
-
---------------------------------------------------------------------------------
--- * Fetching documentation
-
-getDocPage :: DocPageSummary -> IO DocPage
-getDocPage = \case
-  ManSummary  m -> getManPage m
-  HelpSummary h -> getHelpPage h
-
-getManPage :: HasCallStack => ManPageSummary -> IO DocPage
-getManPage (WhatisDescr w) = do
-  let (n, s) = (w ^. name, w ^. section)
-  path <- trim <$> readProcess "man" ["-S", s, "-w", n] ""
-  -- TODO: Man pages might be in some other encoding like Latin1?
-  -- TODO: Man pages might be stored in other formats?
-  txt <- if takeExtension path == ".gz"
-    then T.decodeUtf8 . BS.toStrict . decompress <$> BS.readFile path
-    else T.readFile path
-  pure (Man (parseMan txt))
-getManPage (UnknownFormat _) =
-  -- TODO: Error handling
-  error "Error: Unexpected format for man page summary."
-
-getShortHelp :: FilePath -> [String] -> IO (Maybe Text)
-getShortHelp binPath subcPath = readProcessSimple binPath (subcPath <> ["-h"])
-
-getLongHelp :: FilePath -> [String] -> IO (Maybe Text)
-getLongHelp binPath subcPath = readProcessSimple binPath (subcPath <> ["--help"])
-
-getHelpPage :: HasCallStack => HelpPageSummary -> IO DocPage
-getHelpPage (HelpPageSummary binPath subcPath short _) =
-  let (parse, get) = if short
-        then (ShortHelp . parseShortHelp, getShortHelp)
-        else (LongHelp . parseLongHelp, getLongHelp)
-  in parse . fromJust' <$> get binPath subcPath
 
 --------------------------------------------------------------------------------
 -- * Selection process
@@ -263,7 +225,7 @@ saveSelectionAppHandleEvent s = \case
 summaryButtonStr :: DocPageSummary -> String
 summaryButtonStr = \case
   HelpSummary (HelpPageSummary bp scp sh _) ->
-    abbrev bp <> " " <> unwords scp <> if sh then " -h" else " --help"
+    abbrev bp <> " " <> unwords (map show scp) <> if sh then " -h" else " --help"
     where abbrev (splitFileName -> (ds, fn)) =
             let (dr, splitDirectories -> dirs) = splitDrive ds
                 middir = maybe ".." (</> "..") (headMaybe dirs)

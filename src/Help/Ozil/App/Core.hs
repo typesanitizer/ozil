@@ -24,7 +24,8 @@ module Help.Ozil.App.Core
 
 import Commons hiding (to)
 
-import Help.Page (LinkState, mkLinkStateOff, DocPage)
+import Help.Page
+  (getNewSubcommand, highlightedSubcommand, LinkState, mkLinkStateOff, DocPage)
 import Help.Ozil.App.Config.Watch (WatchManager, FSEvent)
 import Help.Ozil.App.Config.Types (Config)
 import Help.Ozil.App.Cmd (optCommand, Options, HasDebugMode(..), _Default)
@@ -32,13 +33,12 @@ import Help.Ozil.App.Cmd (optCommand, Options, HasDebugMode(..), _Default)
 import Brick (App (..))
 import Brick.BChan (BChan)
 import Data.Focused (Focused)
-import Lens.Micro (to)
 import Lens.Micro.Type (SimpleGetter)
 
 import qualified Data.Focused as F
 
 --------------------------------------------------------------------------------
--- * GUI
+-- * Data types
 
 type OApp = Brick.App OState OEvent OResource
 
@@ -53,29 +53,49 @@ data OWatch
   = Uninitialized !WatchManager
   | Running       !(IO ()) -- ^ Action to stop the watch
 
+data View = View { _viewDocPage :: !DocPage, _viewLinkState :: !LinkState }
+
 data OState = OState
   { oStateOptions    :: !Options
   , _oStateConfig    :: !Config
-  , _oStateDocs      :: !(Focused DocPage)
+  , _oStateViews     :: !(Focused View)
   , _oStateWatch     :: !OWatch
   , oStateChan       :: !(BChan OEvent)
   , _oStateHeading   :: !Text
-  , _oStateLinkState :: !LinkState
   , _oStateDebugMode :: !Bool
   }
+
+makeFields ''View
 makeFields ''OState
 
 class HasDoc s d | s -> d where
   doc :: SimpleGetter s d
 
-pushDoc :: DocPage -> OState -> OState
-pushDoc = over docs . F.clipPushBy (\_ _ -> False)
+instance HasDoc OState DocPage where
+  doc = views . F.focusL . docPage
+
+instance HasLinkState OState LinkState where
+  linkState = views . F.focusL . linkState
+
+--------------------------------------------------------------------------------
+-- * Operations
+
+mkView :: DocPage -> View
+mkView d = View d (mkLinkStateOff d)
+
+-- | Use the existing LinkState to push the highlighted document onto the stack.
+pushDoc :: OState -> IO OState
+pushDoc s = case highlightedSubcommand (s ^. linkState) d of
+  Nothing -> pure s
+  Just subc -> do
+    d' <- getNewSubcommand subc d
+    let mod_f dp = F.clipPushBy ((==) `on` (^. docPage)) (mkView dp)
+    pure (maybe s (\dp -> over views (mod_f dp) s) d')
+
+  where d = s ^. views . F.focusL . docPage
 
 popDoc :: OState -> OState
-popDoc = over docs F.tryPop
-
-instance HasDoc OState DocPage where
-  doc = to (F.focus . _oStateDocs)
+popDoc = over views F.tryPop
 
 getOptions :: OState -> Options
 getOptions = oStateOptions
@@ -93,10 +113,9 @@ newOState
 newOState opts wm ch dp cfg = OState
   { oStateOptions    = opts
   , _oStateConfig    = cfg
-  , _oStateDocs      = F.singleton dp
+  , _oStateViews     = F.singleton (mkView dp)
   , _oStateWatch     = Uninitialized wm
   , oStateChan       = ch
   , _oStateHeading   = "binaryname"
-  , _oStateLinkState = mkLinkStateOff dp
   , _oStateDebugMode = fromMaybe False (opts ^? optCommand._Default.debugMode)
   }

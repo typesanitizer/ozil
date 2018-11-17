@@ -7,6 +7,8 @@ module Help.Ozil.App.Cmd.Types
 
 import Commons
 
+import Help.Subcommand (Subcommand)
+
 import Lens.Micro (Traversal')
 
 data ConfigOptions
@@ -67,7 +69,7 @@ data InputFile
 -- @["override", "set"]@.
 data CmdInput = CmdInput
   { _cmdInputPrimary        :: !InputFile
-  , _cmdInputSubcommandPath :: [String]
+  , _cmdInputSubcommandPath :: [Subcommand]
   } deriving Show
 
 data DefaultOptions = DefaultOptions

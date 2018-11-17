@@ -79,10 +79,11 @@ handleEvent s = \case
           KeyPress (Vty.KChar 'p') -> Page.mapLinkState (subtract 1)
           _ -> id
     let chDS = case ev of
-          KeyPress' (Vty.KChar 'n') [Vty.MCtrl] -> pushDoc undefined
-          KeyPress' (Vty.KChar 'p') [Vty.MCtrl] -> popDoc
-          _ -> id
-    Brick.continue (chDS $ over linkState chLS s)
+          KeyPress' (Vty.KChar 'n') [Vty.MCtrl] -> pushDoc
+          KeyPress' (Vty.KChar 'p') [Vty.MCtrl] -> pure . popDoc
+          _ -> pure
+    s' <- liftIO (chDS (over linkState chLS s))
+    Brick.continue s'
   where
     stopProgram = do
       case s ^. watch of

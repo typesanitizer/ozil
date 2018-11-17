@@ -4,6 +4,7 @@ module Help.Ozil.App.Cmd.Parser
 
 import Commons
 
+import Help.Subcommand (mkSubcommand)
 import Help.Ozil.App.Cmd.Types
 
 import Options.Applicative
@@ -102,7 +103,7 @@ defaultOptionsP =
   -- the shell wouldn't let the input through, so using init is justified.
   toCmdInput s = case words s of
     [] -> error "Error: Empty input. What do you want me to do? :("
-    w:ws -> CmdInput (toInputFile w) ws
+    w:ws -> CmdInput (toInputFile w) (mkSubcommand <$> ws)
   toInputFile s =
     if any isPathSeparator s
       then InputPath filetype s

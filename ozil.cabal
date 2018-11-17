@@ -79,6 +79,11 @@ library
       Control.Lens.Extra
       Data.Focused
       Data.Pair
+      Help.Page
+          Help.Page.Help
+          Help.Page.Internal
+          Help.Page.Lenses
+          Help.Page.Man
       Help.Ozil.App
           Help.Ozil.App.Cmd
               Help.Ozil.App.Cmd.Parser
@@ -92,10 +97,7 @@ library
           Help.Ozil.App.Default
           Help.Ozil.App.Startup
               Help.Ozil.App.Startup.Core
-      Help.Page
-          Help.Page.Help
-          Help.Page.Lenses
-          Help.Page.Man
+      Help.Subcommand
       System.Man
           System.Man.Parser
           System.Man.Types

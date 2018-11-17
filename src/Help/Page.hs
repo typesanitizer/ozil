@@ -1,19 +1,23 @@
 module Help.Page
   ( DocPage (..)
+  , parseHelpPage
+  , parseManPage
+  , DocPageSummary (..)
   , ManPageSummary (..)
   , parseManPageSummary
   , HelpPageSummary (..)
-
-  , parseShortHelp
-  , parseLongHelp
-  , parseMan
-
-  , DocPageSummary (..)
 
   , LinkState
   , mkLinkStateOff
   , flipLinkState
   , mapLinkState
+
+  , highlightedSubcommand
+  , getNewSubcommand
+
+  , getDocPage
+  , getLongHelp
+  , getShortHelp
 
   , render
   )
@@ -22,68 +26,43 @@ module Help.Page
 import Commons
 
 import Help.Page.Help
+import Help.Page.Internal
+import Help.Page.Lenses (section, name, subcommandPath, anchors)
 
 import Help.Page.Man
-  ( parseManPage, ManPage (..), ManPageView (..), WhatisDescription (..)
-  , parseWhatisDescription)
+  (ManPageView (..), ManPage (..), parseWhatisDescription, parseManPage)
+import Help.Subcommand (mkSubcommand, Subcommand)
 
 import Brick hiding (txt, render)
 
 import Brick.FastMarkup (fmWrap)
+import Codec.Compression.GZip (decompress)
+import Data.List.Extra (trim)
 import Data.Monoid (Sum(..))
+import System.FilePath (takeExtension)
+import System.Process (readProcess)
 import Text.Wrap (WrapSettings (..))
 
 import qualified Brick
+import qualified Data.ByteString.Lazy as BS
+import qualified Data.Text.IO as T
+import qualified Data.Text.Encoding as T
 import qualified Data.Vector.Generic as V
 
 --------------------------------------------------------------------------------
--- * Pages
-
-data DocPage
-  = Man       { _docPageManPage  :: ManPage  }
-  | LongHelp  { _docPageHelpPage :: HelpPage }
-  | ShortHelp { _docPageHelpPage :: HelpPage }
-
-data ManPageSummary
-  = WhatisDescr !WhatisDescription
-  | UnknownFormat { _shortDescription :: String }
+-- * Parsing
 
 parseManPageSummary :: String -> ManPageSummary
 parseManPageSummary s =
   maybe (UnknownFormat s) WhatisDescr (parseWhatisDescription s)
 
--- FIXME: Erm, these record field names don't make sense. Available and Text?
-data HelpPageSummary = HelpPageSummary
-  { binaryPath         :: FilePath
-  , subcommandPath     :: [String]
-  , shortHelpAvailable :: !Bool
-  , shortHelpText      :: Text
-  }
-
-data DocPageSummary
-  = ManSummary  !ManPageSummary
-  | HelpSummary !HelpPageSummary
-
-parseLongHelp :: Text -> HelpPage
-parseLongHelp = parseHelpPage
-
--- TODO: Improve this...
-parseShortHelp :: Text -> HelpPage
-parseShortHelp = parseLongHelp
-
-parseMan :: Text -> ManPage
-parseMan = parseManPage
-
-data LinkState
-  = LinksOff {len :: !Int, _prev :: !Int}
-  | LinksOn  {len :: !Int, _sel  :: !Int}
-  deriving Show
+--------------------------------------------------------------------------------
+-- * Working with LinkState
 
 mkLinkStateOff :: DocPage -> LinkState
 mkLinkStateOff = \case
-  Man{} -> LinksOff 0 0
-  LongHelp  HelpPage{_helpPageAnchors = t} -> LinksOff (V.length t) 0
-  ShortHelp HelpPage{_helpPageAnchors = t} -> LinksOff (V.length t) 0
+  Man{} -> LinksOff 0 0 -- FIXME: Unimpelemented logic.
+  Help _ hp -> LinksOff (V.length (hp ^. anchors)) 0
 
 flipLinkState :: LinkState -> LinkState
 flipLinkState = \case
@@ -95,11 +74,69 @@ mapLinkState f = \case
   LinksOff c x -> LinksOff c x
   LinksOn c i -> LinksOn c (inBounds 0 (f i) (c - 1))
 
+--------------------------------------------------------------------------------
+-- ** Working with subcommands
+
+highlightedSubcommand :: LinkState -> DocPage -> Maybe Subcommand
+highlightedSubcommand = f
+  where
+    f LinksOff{} _ = Nothing
+    f _ Man{}      = Nothing -- FIXME: Implement this
+    f LinksOn{len, _sel} (Help _ h) = if len == 0 then Nothing else
+      let err = error "Error: Improper index stored."
+          TableEntry{_name} = fromMaybe err (getEntry _sel h)
+      in Just (mkSubcommand (unpack _name))
+
+getNewSubcommand :: Subcommand -> DocPage -> IO (Maybe DocPage)
+getNewSubcommand subc dp = case dp of
+  Man{} -> undefined
+  Help hsum _ -> do
+    let hsum' = over subcommandPath (subc:) hsum
+    getHelpPage hsum'
+
+--------------------------------------------------------------------------------
+-- * Fetching documentation
+
+getDocPage :: DocPageSummary -> IO (Maybe DocPage)
+getDocPage = \case
+  ManSummary  m -> getManPage m
+  HelpSummary h -> getHelpPage h
+
+-- TODO: Try to catch more errors here.
+getManPage :: HasCallStack => ManPageSummary -> IO (Maybe DocPage)
+getManPage msum@(WhatisDescr w) = do
+  let (n, s) = (w ^. name, w ^. section)
+  path <- trim <$> readProcess "man" ["-S", s, "-w", n] ""
+  -- TODO: Man pages might be in some other encoding like Latin1?
+  -- TODO: Man pages might be stored in other formats?
+  txt <- if takeExtension path == ".gz"
+    then T.decodeUtf8 . BS.toStrict . decompress <$> BS.readFile path
+    else T.readFile path
+  pure (Just (Man msum (parseManPage txt)))
+getManPage (UnknownFormat _) =
+  -- TODO: Error handling
+  error "Error: Unexpected format for man page summary."
+
+getShortHelp :: FilePath -> [Subcommand] -> IO (Maybe Text)
+getShortHelp binPath subcPath
+  = readProcessSimple binPath (map show subcPath <> ["-h"])
+
+getLongHelp :: FilePath -> [Subcommand] -> IO (Maybe Text)
+getLongHelp binPath subcPath
+  = readProcessSimple binPath (map show subcPath <> ["--help"])
+
+getHelpPage :: HasCallStack => HelpPageSummary -> IO (Maybe DocPage)
+getHelpPage hsum@(HelpPageSummary binPath subcPath short _) =
+  let get = if short then getShortHelp else getLongHelp
+  in fmap (Help hsum . parseHelpPage) <$> get binPath subcPath
+
+--------------------------------------------------------------------------------
+-- * Rendering
+
 render :: LinkState -> DocPage -> Widget n
 render ls = \case
-  Man m -> renderManPage m
-  LongHelp h -> renderHelpPage ls h
-  ShortHelp h -> renderHelpPage ls h
+  Man _ m -> renderManPage m
+  Help _ h -> renderHelpPage ls h
 
 renderManPage :: ManPage -> Widget n
 renderManPage (ManPage (ManPageView h sections _ fm) _) =
@@ -109,10 +146,10 @@ renderManPage (ManPage (ManPageView h sections _ fm) _) =
   where
     renderHeading = const emptyWidget
     each f = V.toList . V.imap f
+    -- TODO: unused index. This can be fixed once we get rid of the
+    -- Twinkle twinkle little star.
     renderSection _i (sh, _chnks) = vBox
       [renderSectionHeading sh, fmWrap (fm !!! 0)]
-    -- renderSection i (sh, _chnks) = vBox
-    --   [renderSectionHeading sh, fmWrap (fm !!! i)]
     renderSectionHeading = Brick.txt
 
 renderHelpPage :: LinkState -> HelpPage -> Widget n

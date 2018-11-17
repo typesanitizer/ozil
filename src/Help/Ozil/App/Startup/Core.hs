@@ -40,9 +40,6 @@ runStartup o c ma = do
 evalStartup :: Options -> Config -> Startup a -> IO a
 evalStartup a b c = fst <$> runStartup a b c
 
--- execO :: Options -> Config -> Startup a -> IO Config
--- execO a b c = snd <$> runO a b c
-
 --------------------------------------------------------------------------------
 -- * Environment
 

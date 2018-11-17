@@ -4,7 +4,7 @@
 
 module Help.Page.Help
   ( HelpPage (..), Item (..), ItemIndent (..), TableEntry (..), parseHelpPage
-  , TableType (..)
+  , TableType (..), getEntry
   ) where
 
 import Commons
@@ -28,10 +28,22 @@ data HelpPage = HelpPage
   , _helpPageSynopsis :: Optional           -- ^ Equivalent to "usage"
   , _helpPageBody     :: Vector Item
   , _helpPageAnchors  :: UVector (Int, Int)
-    -- ^ Pair of coordinates to index into the body and _entries field.
+    -- ^ Pair of coordinates to index into the body and then Item._entries.
+    -- E.g. if the vector is [(3, 0), (3, 1), (7, 0), (7, 1) (7, 2)] that
+    -- means that we have two tables of subcommands, stored at indices 3 and 7,
+    -- and the first one has two elements and the second one has 3 elements.
+    -- It is useful to store all pairs and not just lengths, because now we
+    -- can index+iterate directly -- e.g. we now know that there are 5
+    -- subcommands and the fifth one is at (7, 2).
   , _helpPageTableIxs :: UVector Int
-    -- ^ List of indices at which tables are stored in body.
+    -- ^ Indices at which subcommand tables are stored in body.
   }
+
+getEntry :: Int -> HelpPage -> Maybe TableEntry
+getEntry i HelpPage{_helpPageBody = b, _helpPageAnchors = a} =
+  if i < 0 || i >= V.length a then Nothing
+  else let (j, k) = a V.! i
+       in Just (_entries (b V.! j) V.! k)
 
 data TableType = Flag | Subcommand
   deriving (Eq, Show)
