@@ -39,7 +39,7 @@ are made to the Vty package which is a dependency.)
 ### Download a binary
 
 Binaries are unavailable at the moment but I plan on adding them.
-See the [open issue](https://github.com/theindigamer/ozil/issues/12) for this
+See the link:https://github.com/theindigamer/ozil/issues/12[open issue] for this
 for current status.
 
 ### Building from source

@@ -165,7 +165,7 @@ plainP = do
   spaces <- takeWhileP Nothing isSpace
   ind <- getIndent
   modify (set curPlainIndent (Just ind))
-  rest <- takeWhile1P Nothing (/= '\n') <* optional newline
+  rest <- takeWhile1P' (/= '\n') <* optional newline
   pure $ Plain (T.snoc (spaces <> rest) '\n')
 
 ------------------------------------------------------------
@@ -182,7 +182,7 @@ subcommandTextP = do
   -- we are sticking to the same indentation, we're still in the text block,
   -- instead of trying to parse the following as a subcommand.
   guard (pti /= Just curInd)
-  lookAhead letterChar *> takeWhile1P Nothing (\c -> c == '-' || isAlphaNum c)
+  lookAhead letterChar *> takeWhile1P' (\c -> c == '-' || isAlphaNum c)
 
 ------------------------------------------------------------
 -- *** Flags
@@ -251,7 +251,7 @@ simpleItemParser tblTy col1P indentLens =
     )
 
 lookThenGobble :: MonadParsec e Text m => m a -> m Text
-lookThenGobble lk = lookAhead lk *> takeWhile1P Nothing (/= ' ')
+lookThenGobble lk = lookAhead lk *> takeWhile1P' (/= ' ')
 
 twoColumn
   :: (MonadParsec e Text m, MonadState PS m)
@@ -306,7 +306,7 @@ descriptionP descInd savedDescIndent = do
   where
     descrLine =
       lookAhead (notChar '[')
-      *> takeWhile1P Nothing (/= '\n')
+      *> takeWhile1P' (/= '\n')
       <* (void newline <|> eof)
 
 isNothingOrJustEq :: Eq a => Maybe a -> a -> Bool
