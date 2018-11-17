@@ -11,6 +11,7 @@ module Help.Page
   , mkLinkStateOff
   , flipLinkState
   , mapLinkState
+  , isOn
 
   , highlightedSubcommand
   , getNewSubcommand
@@ -73,6 +74,10 @@ mapLinkState :: (Int -> Int) -> LinkState -> LinkState
 mapLinkState f = \case
   LinksOff c x -> LinksOff c x
   LinksOn c i -> LinksOn c (inBounds 0 (f i) (c - 1))
+
+isOn :: LinkState -> Bool
+isOn LinksOff{} = False
+isOn LinksOn{}  = True
 
 --------------------------------------------------------------------------------
 -- ** Working with subcommands

@@ -137,8 +137,14 @@ viewerUI s =
       Brick.strWrap (s ^? doc . helpPage . anchors & show)
       ===
       Brick.str (s ^? doc . helpPage . tableIxs & show)
-    keyBindings = "Esc/q = Exit  k/↑ = Up  j/↓ = Down\
-                  \  f = Follow  n = Next  p = Previous"
+    keyBindings = keyBindings1 <> "\n" <> keyBindings2
+    keyBindings1 = "Esc/q = Exit  k/↑ = Up  C-u = Up!  j/↓ = Down  C-d = Down!"
+    keyBindings2 =
+      if s ^. linkState & Page.isOn then
+        "f = Turn off hints  n = Next hint  p = Previous hint\n\
+        \                  C-n = Follow   C-p = Go back"
+      else
+        "f = Turn on hints"
     header = T.snoc (T.cons ' ' (s ^. heading)) ' '
     mainstuff = Page.render (s ^. linkState) (s ^. doc)
       & Brick.viewport TextViewport Brick.Vertical
