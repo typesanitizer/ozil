@@ -18,7 +18,7 @@ import Data.Char (isSpace, isAlphaNum, isUpper)
 import Data.List.Split (chop)
 import Lens.Micro ((%~))
 import Lens.Micro.TH (makeLenses)
-import Lens.Micro.Type (SimpleGetter)
+import Lens.Micro.Type (Lens', SimpleGetter)
 import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 
@@ -51,7 +51,7 @@ getEntry i HelpPage{_helpPageBody = b, _helpPageAnchors = a} =
   else let (j, k) = a V.! i
        in Just (_entries (b V.! j) V.! k)
 
-data TableType = Flag | Subcommand
+data TableType = Arg | Flag | Subcommand
   deriving (Eq, Show)
 
 data Item
@@ -84,6 +84,10 @@ data IndentGuess = IndentGuess
   -- @
   -- this value should be (Just 2 16, Just 5).
   , _subcommandIndent :: Maybe ItemIndent
+
+  , _argIndent        :: Maybe ItemIndent
+  -- ^ Stupid help pages like that of "rustup install" have different
+  -- indentations for flag descriptions and arg descriptions. AAARGHH!!!!
   } deriving (Eq, Show)
 makeLenses ''IndentGuess
 
@@ -100,7 +104,7 @@ type Parser = ParsecT () Text (State PS)
 
 runHelpParser :: Parser a -> Text -> (Either (ParseError Char ()) a, IndentGuess)
 runHelpParser p txt = runState (runParserT p "" txt) initState & _2 %~ _guess
-  where initState = PS (IndentGuess (Nothing, Nothing) Nothing) Nothing
+  where initState = PS (IndentGuess (Nothing, Nothing) Nothing Nothing) Nothing
 
 getIndent :: MonadParsec e s m => m Int
 getIndent = subtract 1 . unPos . sourceColumn <$> getPosition
@@ -145,7 +149,7 @@ parseHelpPage txt =
 
 helpP :: Parser [Item]
 helpP =
-  some (nl <|> try flagP <|> try subcommandP <|> plainP)
+  some (nl <|> try flagP <|> try argP <|> try subcommandP <|> plainP)
   <* optional eof
   where
     nl = Plain . T.singleton <$> newline
@@ -168,18 +172,7 @@ plainP = do
 -- *** Subcommands
 
 subcommandP :: (MonadParsec e Text m, MonadState PS m) => m Item
-subcommandP =
-  twoColumn
-    Subcommand
-    subcommandTextP
-    ((:| []) . fmap itemIndent . view subcommandIndent)
-    subcommandIndent
-    (\itmCol descInd s -> case s ^. subcommandIndent of
-        Just _  -> pure ()
-        Nothing ->
-          modify (set (guess . subcommandIndent)
-                  (Just (ItemIndent itmCol descInd)))
-    )
+subcommandP = simpleItemParser Subcommand subcommandTextP subcommandIndent
 
 subcommandTextP :: (MonadParsec e Text m, MonadState PS m) => m Text
 subcommandTextP = do
@@ -218,20 +211,47 @@ flagP =
 
 flagTextP :: MonadParsec e Text m => m Text
 flagTextP = do
-  firstFlag <- gobble (char '-')
+  firstFlag <- lookThenGobble (char '-')
   let next = try $ do
         space1
-        gobble (satisfy (\c -> c == '[' || c == '<' || c == '-')
-                <|> (satisfy isUpper *> satisfy isUpper))
+        lookThenGobble (satisfy (\c -> c == '[' || c == '<' || c == '-')
+                        <|> (satisfy isUpper *> satisfy isUpper))
   nextStuff <- many next
   let flags = T.intercalate " " (firstFlag : nextStuff)
   pure flags
-  where
-    gobble :: MonadParsec e Text m => m a -> m Text
-    gobble lk = lookAhead lk *> takeWhile1P Nothing (/= ' ')
+
+------------------------------------------------------------
+-- *** Args
+
+argP :: (MonadParsec e Text m, MonadState PS m) => m Item
+argP = simpleItemParser Arg argTextP argIndent
+
+argTextP :: MonadParsec e Text m => m Text
+argTextP = lookThenGobble (char '<')
 
 ------------------------------------------------------------
 -- *** Helper functions
+
+simpleItemParser
+  :: (MonadParsec e Text m, MonadState PS m)
+  => TableType
+  -> m Text
+  -> Lens' IndentGuess (Maybe ItemIndent) -> m Item
+simpleItemParser tblTy col1P indentLens =
+  twoColumn
+    tblTy
+    col1P
+    ((:| []) . fmap itemIndent . view indentLens)
+    indentLens
+    (\itmCol descInd s -> case s ^. indentLens of
+        Just _  -> pure ()
+        Nothing ->
+          modify (set (guess . indentLens)
+                  (Just (ItemIndent itmCol descInd)))
+    )
+
+lookThenGobble :: MonadParsec e Text m => m a -> m Text
+lookThenGobble lk = lookAhead lk *> takeWhile1P Nothing (/= ' ')
 
 twoColumn
   :: (MonadParsec e Text m, MonadState PS m)
