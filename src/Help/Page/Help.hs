@@ -13,6 +13,7 @@ import Commons
 
 import Help.Ozil.App.Death (unreachableError)
 
+import Brick (textWidth)
 import Control.Monad.State.Strict
 import Data.Char (isSpace, isAlphaNum, isUpper)
 import Data.List.Split (chop)
@@ -270,9 +271,9 @@ twoColumn tt itemP getSavedItemIndents lx saveIndents = do
   guard (any (`isNothingOrJustEq` itmInd) $ NE.toList itmIndents)
   itm <- itemP
   -- Now get the description
-  space1
+  spaces <- takeWhile1P' isSpace
   descInd <- getIndent
-  desc <- descriptionP descInd (fmap descIndent (s ^. lx))
+  desc <- descriptionP (textWidth spaces) (fmap descIndent (s ^. lx))
   -- Save indentations (if applicable)
   saveIndents itmInd descInd s
   modify (set curPlainIndent Nothing)
@@ -289,11 +290,12 @@ descriptionBlockIsDeeplyIndented = (>= 16)
 
 descriptionP
   :: MonadParsec e Text m
-  => Int       -- ^ Current column
+  => Int       -- ^ Preceding spaces
   -> Maybe Int -- ^ Indentation for description, if known.
   -> m Text
-descriptionP descInd savedDescIndent = do
-  guard (descriptionBlockIsDeeplyIndented descInd)
+descriptionP precedingSpace savedDescIndent = do
+  descInd <- getIndent
+  guard (descriptionBlockIsDeeplyIndented descInd || precedingSpace > 1)
   guard (savedDescIndent `isNothingOrJustEq` descInd)
   firstLine <- descrLine
   let nextLineP = try $ do
