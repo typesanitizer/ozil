@@ -64,13 +64,14 @@ handleEvent s = \case
   KeyPress Vty.KEsc        -> stopProgram
   KeyPress (Vty.KChar 'q') -> stopProgram
   ev -> do
-    let
-      scrollAmt = case ev of
-        KeyPress Vty.KDown       ->  1
-        KeyPress (Vty.KChar 'j') ->  1
-        KeyPress (Vty.KChar 'k') -> -1
-        KeyPress Vty.KUp         -> -1
-        _ -> 0
+    scrollAmt <- case ev of
+        KeyPress Vty.KDown       -> pure 1
+        KeyPress (Vty.KChar 'j') -> pure 1
+        KeyPress (Vty.KChar 'k') -> pure (-1)
+        KeyPress Vty.KUp         -> pure (-1)
+        KeyPress' (Vty.KChar c) [Vty.MCtrl]
+          | c == 'd' || c == 'u' -> halfHeight c
+        _ -> pure 0
     when (scrollAmt /= 0)
       $ Brick.vScrollBy (Brick.viewportScroll TextViewport) scrollAmt
     let chLS = case ev of
@@ -90,6 +91,14 @@ handleEvent s = \case
         Running stopWatch -> liftIO stopWatch
         Uninitialized _ -> pure ()
       Brick.halt s
+    halfHeight :: Char -> Brick.EventM OResource Int
+    halfHeight c = do
+      mvp <- Brick.lookupViewport TextViewport
+      mvp & fromMaybe (error "Viewport missing. Wat.")
+          & view Brick.vpSize
+          & Vty.regionHeight
+          & \h -> pure $ (if c == 'd' then 1 else -1) * (h `div` 2)
+
 
 -- The UI should look like
 --
