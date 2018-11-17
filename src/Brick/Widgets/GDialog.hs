@@ -87,10 +87,19 @@ simpleHandleEvent Pos{idx = i, len} lyt = \case
   EvKey (KChar '\t') [] -> nextButtonBy'   1 True
   EvKey KBackTab     [] -> nextButtonBy' (-1) True
   EvKey KEnter       [] -> Done
-  EvKey KRight [] | H <- lyt -> nextButtonBy'   1  False
-  EvKey KLeft  [] | H <- lyt -> nextButtonBy' (-1) False
-  EvKey KDown  [] | V <- lyt -> nextButtonBy'   1  False
-  EvKey KUp    [] | V <- lyt -> nextButtonBy' (-1) False
+
+  EvKey KRight      [] | H <- lyt -> nextButtonBy'   1  False
+  EvKey (KChar 'l') [] | H <- lyt -> nextButtonBy'   1  False
+
+  EvKey KLeft       [] | H <- lyt -> nextButtonBy' (-1) False
+  EvKey (KChar 'h') [] | H <- lyt -> nextButtonBy' (-1) False
+
+  EvKey KDown       [] | V <- lyt -> nextButtonBy'   1  False
+  EvKey (KChar 'j') [] | V <- lyt -> nextButtonBy' 1  False
+
+  EvKey KUp         [] | V <- lyt -> nextButtonBy' (-1) False
+  EvKey (KChar 'k') [] | V <- lyt -> nextButtonBy' (-1) False
+
   _ -> Unknown
   where
     inRange mn v mx = min mx (max mn v)
