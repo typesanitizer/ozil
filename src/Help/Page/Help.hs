@@ -5,6 +5,8 @@
 module Help.Page.Help
   ( HelpPage (..), Item (..), ItemIndent (..), TableEntry (..), parseHelpPage
   , TableType (..), getEntry
+
+  , IndentGuess (..), runHelpParser, helpP
   ) where
 
 import Commons
@@ -37,6 +39,8 @@ data HelpPage = HelpPage
     -- subcommands and the fifth one is at (7, 2).
   , _helpPageTableIxs :: UVector Int
     -- ^ Indices at which subcommand tables are stored in body.
+  , _helpPageIndents  :: IndentGuess
+    -- ^ Guessed indentation values.
   }
 
 getEntry :: Int -> HelpPage -> Maybe TableEntry
@@ -61,12 +65,12 @@ data TableEntry = TableEntry { _name :: !Text, _description :: !Text }
   deriving Show
 
 data ItemIndent = ItemIndent { itemIndent :: !Int, descIndent ::  !Int }
-  deriving Show
+  deriving (Eq, Show)
 
 data IndentGuess = IndentGuess
   { _flagIndent :: (Maybe ItemIndent, Maybe Int)
   , _subcommandIndent :: Maybe ItemIndent
-  } deriving Show
+  } deriving (Eq, Show)
 makeLenses ''IndentGuess
 
 --------------------------------------------------------------------------------
@@ -78,8 +82,8 @@ runHelpParser :: Parser a -> Text -> (Either (ParseError Char ()) a, IndentGuess
 runHelpParser p txt = runState (runParserT p "" txt) initState
   where initState = IndentGuess (Nothing, Nothing) Nothing
 
-evalHelpParser :: Parser a -> Text -> Either (ParseError Char ()) a
-evalHelpParser a b = fst (runHelpParser a b)
+-- evalHelpParser :: Parser a -> Text -> Either (ParseError Char ()) a
+-- evalHelpParser a b = fst (runHelpParser a b)
 
 getColumn :: MonadParsec e s m => m Int
 getColumn = unPos . sourceColumn <$> getPosition
@@ -88,15 +92,18 @@ getColumn = unPos . sourceColumn <$> getPosition
 -- Do we need it? Can we do without it?
 parseHelpPage :: HasCallStack => Text -> HelpPage
 parseHelpPage txt =
-  evalHelpParser helpP txt
-  & (\case Right x -> x; Left y -> error (show y))
-  & chop groupConcat
-  & V.fromList
-  & (\v ->
-    let tixs = V.fromList
-          [ i | (i, x) <- zip [0 ..] (V.toList v), isTabular Subcommand x ]
-        ancs = V.unfoldr (go v tixs) (0, 0)
-    in HelpPage Nothing Nothing v ancs tixs
+  runHelpParser helpP txt
+  & (\(items, indents) ->
+    items & (\case Right x -> x; Left y -> error (show y))
+          & chop groupConcat
+          & V.fromList
+          & (\v ->
+               let tixs =
+                     V.fromList [ i | (i, x) <- zip [0 ..] (V.toList v)
+                                    , isTabular Subcommand x ]
+                   ancs = V.unfoldr (go v tixs) (0, 0)
+               in HelpPage Nothing Nothing v ancs tixs indents
+            )
     )
   where
     go v u (i, j) =
@@ -146,10 +153,10 @@ subcommandP =
     subcommandTextP
     ((:| []) . fmap itemIndent . view subcommandIndent)
     subcommandIndent
-    (\itmCol descCol s -> case s ^. subcommandIndent of
+    (\itmCol descInd s -> case s ^. subcommandIndent of
         Just _  -> pure ()
         Nothing ->
-          modify (set subcommandIndent (Just (ItemIndent itmCol descCol)))
+          modify (set subcommandIndent (Just (ItemIndent itmCol descInd)))
     )
 
 subcommandTextP :: MonadParsec e Text m => m Text
@@ -166,8 +173,8 @@ flagP =
     flagTextP
     (\s -> let (x, y) = s ^. flagIndent in fmap itemIndent x :| [y])
     (flagIndent . _1)
-    (\itmCol descCol s -> case s ^. flagIndent of
-        (Nothing, Nothing) -> save _1 (Just (ItemIndent itmCol descCol))
+    (\itmCol descInd s -> case s ^. flagIndent of
+        (Nothing, Nothing) -> save _1 (Just (ItemIndent itmCol descInd))
         (Just _,  Nothing) -> save _2 (Just itmCol)
         (Just _,  Just _)  -> pure ()
         (Nothing, Just _)  -> unreachableError
@@ -176,13 +183,13 @@ flagP =
 
 flagTextP :: MonadParsec e Text m => m Text
 flagTextP = do
-  first <- gobble (char '-')
+  firstFlag <- gobble (char '-')
   let next = try $ do
         space1
         gobble (satisfy (\c -> c == '[' || c == '<' || c == '-')
                 <|> (satisfy isUpper *> satisfy isUpper))
   nextStuff <- many next
-  let flags = T.intercalate " " (first : nextStuff)
+  let flags = T.intercalate " " (firstFlag : nextStuff)
   pure flags
   where
     gobble :: MonadParsec e Text m => m a -> m Text
@@ -193,28 +200,28 @@ flagTextP = do
 
 twoColumn
   :: (MonadParsec e Text m, MonadState IndentGuess m)
-  => TableType                               -- ^ Item constructor
-  -> m Text                                  -- ^ Item parser
-  -> (IndentGuess -> NonEmpty (Maybe Int))   -- ^ Item alignments
-  -> SimpleGetter IndentGuess (Maybe ItemIndent)   -- ^ Getter for description indent
-  -> (Int -> Int -> IndentGuess -> m ())     -- ^ Save state at the end.
+  => TableType
+  -> m Text                                      -- ^ Item parser
+  -> (IndentGuess -> NonEmpty (Maybe Int))       -- ^ Item alignments
+  -> SimpleGetter IndentGuess (Maybe ItemIndent) -- ^ Get description indent
+  -> (Int -> Int -> IndentGuess -> m ())         -- ^ Save state at the end.
   -> m Item
 twoColumn tt itemP itmIndentsIn lx saveIndents = do
   -- First get the item
   space1
-  itmCol <- getColumn
+  itmCol <- subtract 1 <$> getColumn
   s <- get
   let itmIndents = itmIndentsIn s
   guard (any (`isNothingOrJustEq` itmCol) $ NE.toList itmIndents)
   itm <- itemP
   -- Now get the description
   space1
-  descCol <- getColumn
-  desc <- descriptionP descCol (fmap descIndent (s ^. lx))
+  descInd <- subtract 1 <$> getColumn
+  desc <- descriptionP descInd (fmap descIndent (s ^. lx))
   -- Save indentations (if applicable)
-  saveIndents itmCol descCol s
+  saveIndents itmCol descInd s
   -- Done
-  pure (Tabular tt (pure (TableEntry itm desc)) (ItemIndent itmCol descCol))
+  pure (Tabular tt (pure (TableEntry itm desc)) (ItemIndent itmCol descInd))
 
 -- | OK, this one is a weird heuristic. The idea is that description blocks
 -- are usually deeply indented, so it would be odd if a description block
@@ -229,14 +236,14 @@ descriptionP
   => Int       -- ^ Current column
   -> Maybe Int -- ^ Indentation for description, if known.
   -> m Text
-descriptionP descCol descIndent = do
-  guard (descriptionBlockIsDeeplyIndented descCol)
-  guard (descIndent `isNothingOrJustEq` descCol)
+descriptionP descInd descIndent = do
+  guard (descriptionBlockIsDeeplyIndented descInd)
+  guard (descIndent `isNothingOrJustEq` descInd)
   firstLine <- descrLine
   let nextLineP = try $ do
         space1
-        descCol' <- getColumn
-        guard (descCol' == descCol)
+        descInd' <- subtract 1 <$> getColumn
+        guard (descInd' == descInd)
         descrLine
   nextLines <- many nextLineP
   pure (T.intercalate " " (firstLine : nextLines))

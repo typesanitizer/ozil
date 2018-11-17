@@ -11,7 +11,7 @@ copyright:      2018 Varun Gandhi
 license:        BSD3
 build-type:     Simple
 extra-source-files:
-    Readme.md
+    Readme.adoc
     ChangeLog.md
 
 source-repository head
@@ -150,4 +150,5 @@ test-suite ozil-test
     , tasty-hspec
   other-modules:
       Brick.FastMarkupSpec
+      Help.Page.HelpSpec
   default-language: Haskell2010

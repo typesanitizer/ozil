@@ -7,7 +7,7 @@ import Help.Ozil.App.Core
 
 import Help.Ozil.App.Config (FSEvent, toReactOrNotToReact)
 import Help.Ozil.App.Startup (finishStartup)
-import Help.Page.Lenses (anchors, tableIxs, helpPage)
+import Help.Page.Lenses (indents, anchors, tableIxs, helpPage)
 
 import qualified Help.Page as Page
 import qualified Help.Ozil.App.Default as Default
@@ -134,9 +134,11 @@ viewerUI s =
     debugWidget =
       Brick.str (s ^. linkState & show)
       ===
-      Brick.strWrap (s ^? doc . helpPage . anchors & show)
+      Brick.strWrap (("Anchors: " <>) . show $ s ^? doc . helpPage . anchors)
       ===
-      Brick.str (s ^? doc . helpPage . tableIxs & show)
+      Brick.strWrap (("TableIxs: " <>) . show $ s ^? doc . helpPage . tableIxs)
+      ===
+      Brick.strWrap (("Indents: " <>) . show $ s ^? doc . helpPage . indents)
     keyBindings = keyBindings1 <> "\n" <> keyBindings2
     keyBindings1 = "Esc/q = Exit  k/↑ = Up  C-u = Up!  j/↓ = Down  C-d = Down!"
     keyBindings2 =

@@ -95,7 +95,8 @@ defaultOptionsP =
         )
     <*> switch
           (  long "debug"
-          <> help "Run ozil in debug mode."
+          <> help "Run ozil in debug mode. You don't want to use this unless\
+                  \ you're working on ozil itself."
           )
  where
   offSwitch = fmap not . switch
