@@ -19,7 +19,8 @@ porcelain for `man`/`--help` + `less`/`more`/`most`.
 ## Platforms
 
 Currently, only Linux is supported. Support for other platforms depends
-on user contributions.
+on user contributions. (Note: Windows support is not possible before changes
+are made to the Vty package which is a dependency.)
 
 ## Installing
 
@@ -35,13 +36,21 @@ git clone https://github.com/theindigamer/ozil.git
 cd ozil && stack install
 ```
 
-This will install `ozil` to `~/.local/bin` which is (hopefully?) on your `$PATH`.
+This will install `ozil` to `~/.local/bin` which is (hopefully?) on your
+`$PATH`.
+
+If you wish to use `cabal` instead of `stack`, use `cabal v2-install`
+instead of `stack install`. This will install `ozil` to `~/.cabal/bin`.
 
 ## Usage
 
 If you want to see the help for `foo`, run `ozil foo`. That's it.
 `ozil` will guide you as needed. Of course, you can try using `ozil ozil`
 as well :smile:.
+
+### Configuration
+
+TODO: Fill out this section.
 
 ## Contributing
 
