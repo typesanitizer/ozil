@@ -132,7 +132,7 @@ viewerUI s =
       Brick.txtWrap keyBindings
   where
     debugWidget =
-      Brick.str (s ^. linkState & show)
+      Brick.strWrap (s ^. doc & Page.displayDocPageSummary)
       ===
       Brick.strWrap (("Anchors: " <>) . show $ s ^? doc . helpPage . anchors)
       ===

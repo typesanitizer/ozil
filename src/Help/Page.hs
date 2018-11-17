@@ -5,6 +5,7 @@ module Help.Page
   , parseHelpPage
   , parseManPage
   , DocPageSummary (..)
+  , displayDocPageSummary
   , ManPageSummary (..)
   , parseManPageSummary
   , HelpPageSummary (..)
@@ -77,6 +78,11 @@ displayHelpPageSummary (HelpPageSummary bp scp sh _) =
   where
     hstr = if sh then "-h" else "--help"
 
+displayDocPageSummary :: DocPage -> String
+displayDocPageSummary = \case
+  Man mps _ -> show mps
+  Help hps _ -> displayHelpPageSummary hps
+
 --------------------------------------------------------------------------------
 -- * Working with LinkState
 
@@ -116,7 +122,7 @@ getNewSubcommand :: Subcommand -> DocPage -> IO (Maybe DocPage)
 getNewSubcommand subc dp = case dp of
   Man{} -> undefined
   Help hsum _ -> do
-    let hsum' = over subcommandPath (subc:) hsum
+    let hsum' = over subcommandPath (++ [subc]) hsum
     getHelpPage hsum'
 
 --------------------------------------------------------------------------------

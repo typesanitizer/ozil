@@ -19,7 +19,7 @@ instance Eq DocPage where
 data ManPageSummary
   = WhatisDescr !WhatisDescription
   | UnknownFormat { _shortDescription :: String }
-  deriving Eq
+  deriving (Eq, Show)
 
 -- FIXME: Erm, these record field names don't make sense. Available and Text?
 data HelpPageSummary = HelpPageSummary

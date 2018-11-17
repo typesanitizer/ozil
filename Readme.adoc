@@ -60,9 +60,10 @@ instead of `stack install`. This will install `ozil` to `~/.cabal/bin`.
 
 ## Usage
 
-If you want to see the help for `foo`, run `ozil foo`. That's it.
-`ozil` will guide you as needed. Of course, you can try using `ozil ozil`
-as well :smile:.
+If you want to see the help for `foo`, run `ozil foo`. If you want to see the
+help for `foo bar` (where `bar` is a subcommand of `foo`) run `ozil 'foo bar'`.
+That's mostly it. `ozil` will guide you as needed. Of course, you can try using
+`ozil ozil` as well :smile:.
 
 ### Configuration
 

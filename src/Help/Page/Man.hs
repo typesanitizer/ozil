@@ -38,7 +38,7 @@ data WhatisDescription = WhatisDescription
   { _whatisDescriptionName             :: String
   , _whatisDescriptionSection          :: String
   , _whatisDescriptionShortDescription :: String
-  } deriving Eq
+  } deriving (Eq, Show)
 
 parseWhatisDescription :: String -> Maybe WhatisDescription
 parseWhatisDescription = parseMaybe p
