@@ -19,6 +19,7 @@ warn = T.putStrLn . T.append "Warning: "
 
 newtype DefaultBool = DefaultBool Bool
 
+{-# COMPLETE DefaultYes, DefaultNo #-}
 pattern DefaultYes, DefaultNo :: DefaultBool
 pattern DefaultYes = DefaultBool True
 pattern DefaultNo  = DefaultBool False
@@ -38,4 +39,6 @@ prompt def msg = do
   where
     confusedMsg = "Didn't quite get what you meant...\n\
                   \ Use one of y/Y/n/N or hit return to use the default value."
-    fullMsg = T.append msg $ if coerce def then " [Y/n] " else " [y/N] "
+    fullMsg = T.append msg $ case def of
+      DefaultYes -> " [Y/n] "
+      DefaultNo  -> " [y/N] "

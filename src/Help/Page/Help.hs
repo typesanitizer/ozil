@@ -59,10 +59,10 @@ data Item
     , _entries   :: Vector TableEntry
     , _indents   :: !ItemIndent
     }
-  deriving Show
+  deriving (Eq, Show)
 
 data TableEntry = TableEntry { _name :: !Text, _description :: !Text }
-  deriving Show
+  deriving (Eq, Show)
 
 data ItemIndent = ItemIndent { itemIndent :: !Int, descIndent ::  !Int }
   deriving (Eq, Show)
@@ -82,11 +82,8 @@ runHelpParser :: Parser a -> Text -> (Either (ParseError Char ()) a, IndentGuess
 runHelpParser p txt = runState (runParserT p "" txt) initState
   where initState = IndentGuess (Nothing, Nothing) Nothing
 
--- evalHelpParser :: Parser a -> Text -> Either (ParseError Char ()) a
--- evalHelpParser a b = fst (runHelpParser a b)
-
-getColumn :: MonadParsec e s m => m Int
-getColumn = unPos . sourceColumn <$> getPosition
+getIndent :: MonadParsec e s m => m Int
+getIndent = subtract 1 . unPos . sourceColumn <$> getPosition
 
 -- TODO: We don't have Heading and synopsis parsing at the momemnt.
 -- Do we need it? Can we do without it?
@@ -206,22 +203,22 @@ twoColumn
   -> SimpleGetter IndentGuess (Maybe ItemIndent) -- ^ Get description indent
   -> (Int -> Int -> IndentGuess -> m ())         -- ^ Save state at the end.
   -> m Item
-twoColumn tt itemP itmIndentsIn lx saveIndents = do
+twoColumn tt itemP getSavedItemIndents lx saveIndents = do
   -- First get the item
   space1
-  itmCol <- subtract 1 <$> getColumn
+  itmInd <- getIndent
   s <- get
-  let itmIndents = itmIndentsIn s
-  guard (any (`isNothingOrJustEq` itmCol) $ NE.toList itmIndents)
+  let itmIndents = getSavedItemIndents s
+  guard (any (`isNothingOrJustEq` itmInd) $ NE.toList itmIndents)
   itm <- itemP
   -- Now get the description
   space1
-  descInd <- subtract 1 <$> getColumn
+  descInd <- getIndent
   desc <- descriptionP descInd (fmap descIndent (s ^. lx))
   -- Save indentations (if applicable)
-  saveIndents itmCol descInd s
+  saveIndents itmInd descInd s
   -- Done
-  pure (Tabular tt (pure (TableEntry itm desc)) (ItemIndent itmCol descInd))
+  pure (Tabular tt (pure (TableEntry itm desc)) (ItemIndent itmInd descInd))
 
 -- | OK, this one is a weird heuristic. The idea is that description blocks
 -- are usually deeply indented, so it would be odd if a description block
@@ -236,20 +233,20 @@ descriptionP
   => Int       -- ^ Current column
   -> Maybe Int -- ^ Indentation for description, if known.
   -> m Text
-descriptionP descInd descIndent = do
+descriptionP descInd savedDescIndent = do
   guard (descriptionBlockIsDeeplyIndented descInd)
-  guard (descIndent `isNothingOrJustEq` descInd)
+  guard (savedDescIndent `isNothingOrJustEq` descInd)
   firstLine <- descrLine
   let nextLineP = try $ do
         space1
-        descInd' <- subtract 1 <$> getColumn
+        descInd' <- getIndent
         guard (descInd' == descInd)
         descrLine
   nextLines <- many nextLineP
   pure (T.intercalate " " (firstLine : nextLines))
   where
     descrLine =
-      lookAhead (notChar '[') *> takeWhile1P Nothing (/= '\n') <* newline
+      lookAhead (notChar '[') *> takeWhile1P Nothing (/= '\n') <* (void newline <|> eof)
 
 isNothingOrJustEq :: Eq a => Maybe a -> a -> Bool
 isNothingOrJustEq Nothing  _ = True

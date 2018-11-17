@@ -65,6 +65,7 @@ library
     , optparse-applicative
     , process
     , split
+    , template-haskell
     , text
     , unordered-containers
     , vector
@@ -98,6 +99,7 @@ library
           Help.Ozil.App.Startup
               Help.Ozil.App.Startup.Core
       Help.Subcommand
+      Syntax.RawString
       System.Man
           System.Man.Parser
           System.Man.Types

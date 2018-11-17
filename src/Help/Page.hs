@@ -200,8 +200,6 @@ renderHelpPage ls HelpPage{_helpPageBody = v, _helpPageAnchors = a} =
         $ V.imap (\j -> renderEntry i j tt inds) ents
 
     defaultRightPadding = 4
-    -- TODO: There is still an off-by-one error hiding somewhere. Try ozil ozil.
-    -- We _could_ "fix" it by adding a (- 1) to the gap but is that right?
     renderEntry i j tblTy
       ItemIndent{itemIndent, descIndent}
       TableEntry{_name=item, _description=desc}
