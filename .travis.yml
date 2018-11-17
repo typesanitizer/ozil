@@ -57,6 +57,7 @@ install:
       stack build --only-dependencies --no-terminal
       stack install hlint
     fi
+
 script:
   - |
     if [ -z "$STACK_YAML" ]; then
@@ -66,5 +67,6 @@ script:
       stack build --test --bench --no-run-benchmarks --no-terminal
       hlint .
     fi
+
 notifications:
-email: false
+  email: false
