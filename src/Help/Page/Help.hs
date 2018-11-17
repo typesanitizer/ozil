@@ -40,7 +40,8 @@ data HelpPage = HelpPage
   , _helpPageTableIxs :: UVector Int
     -- ^ Indices at which subcommand tables are stored in body.
   , _helpPageIndents  :: IndentGuess
-    -- ^ Guessed indentation values.
+    -- ^ Guessed indentation values. Note: The values contained are
+    -- /not column numbers/ (indent = colNum - 1).
   }
 
 getEntry :: Int -> HelpPage -> Maybe TableEntry
@@ -69,6 +70,18 @@ data ItemIndent = ItemIndent { itemIndent :: !Int, descIndent ::  !Int }
 
 data IndentGuess = IndentGuess
   { _flagIndent :: (Maybe ItemIndent, Maybe Int)
+  -- ^ Indentation for flags, with the second Int giving the indentation for a
+  -- deeply indented flag, if there is one. For both
+  -- @
+  --   -f --foo      foo
+  --      --bar      bar
+  -- @
+  -- and
+  -- @
+  --      --bar      bar
+  --   -f --foo      foo
+  -- @
+  -- this value should be (Just 2 16, Just 5).
   , _subcommandIndent :: Maybe ItemIndent
   } deriving (Eq, Show)
 makeLenses ''IndentGuess
@@ -170,11 +183,18 @@ flagP =
     flagTextP
     (\s -> let (x, y) = s ^. flagIndent in fmap itemIndent x :| [y])
     (flagIndent . _1)
-    (\itmCol descInd s -> case s ^. flagIndent of
-        (Nothing, Nothing) -> save _1 (Just (ItemIndent itmCol descInd))
-        (Just _,  Nothing) -> save _2 (Just itmCol)
+    (\itmInd descInd s -> case s ^. flagIndent of
         (Just _,  Just _)  -> pure ()
         (Nothing, Just _)  -> unreachableError
+        (Nothing, Nothing) -> save _1 (Just (ItemIndent itmInd descInd))
+        (Just fi, Nothing) ->
+          let fi_ii = itemIndent fi
+          in case compare fi_ii itmInd of
+            EQ -> pure ()
+            LT -> save _2 (Just itmInd)
+            -- This case means we encountered a more deeply indented flag before
+            -- encountering the shallow indented flag.
+            GT -> save id (Just fi{itemIndent = itmInd}, Just fi_ii)
     )
    where save lx v = modify (set (flagIndent . lx) v)
 
