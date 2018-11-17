@@ -14,8 +14,9 @@ import Commons
 import Help.Ozil.App.Death (unreachableError)
 
 import Control.Monad.State.Strict
-import Data.Char (isAlphaNum, isUpper)
+import Data.Char (isSpace, isAlphaNum, isUpper)
 import Data.List.Split (chop)
+import Lens.Micro ((%~))
 import Lens.Micro.TH (makeLenses)
 import Lens.Micro.Type (SimpleGetter)
 import Text.Megaparsec hiding (State)
@@ -89,11 +90,17 @@ makeLenses ''IndentGuess
 --------------------------------------------------------------------------------
 -- * Parsing
 
-type Parser = ParsecT () Text (State IndentGuess)
+data PS = PS
+  { _guess      :: !IndentGuess
+  , _curPlainIndent :: !(Maybe Int)
+  }
+makeLenses ''PS
+
+type Parser = ParsecT () Text (State PS)
 
 runHelpParser :: Parser a -> Text -> (Either (ParseError Char ()) a, IndentGuess)
-runHelpParser p txt = runState (runParserT p "" txt) initState
-  where initState = IndentGuess (Nothing, Nothing) Nothing
+runHelpParser p txt = runState (runParserT p "" txt) initState & _2 %~ _guess
+  where initState = PS (IndentGuess (Nothing, Nothing) Nothing) Nothing
 
 getIndent :: MonadParsec e s m => m Int
 getIndent = subtract 1 . unPos . sourceColumn <$> getPosition
@@ -149,14 +156,18 @@ helpP =
 ------------------------------------------------------------
 -- *** Plain text
 
-plainP :: MonadParsec e Text m => m Item
-plainP = Plain . flip T.snoc '\n'
-  <$> (takeWhile1P Nothing (/= '\n') <* optional newline)
+plainP :: (MonadParsec e Text m, MonadState PS m) => m Item
+plainP = do
+  spaces <- takeWhileP Nothing isSpace
+  ind <- getIndent
+  modify (set curPlainIndent (Just ind))
+  rest <- takeWhile1P Nothing (/= '\n') <* optional newline
+  pure $ Plain (T.snoc (spaces <> rest) '\n')
 
 ------------------------------------------------------------
 -- *** Subcommands
 
-subcommandP :: (MonadParsec e Text m, MonadState IndentGuess m) => m Item
+subcommandP :: (MonadParsec e Text m, MonadState PS m) => m Item
 subcommandP =
   twoColumn
     Subcommand
@@ -166,17 +177,24 @@ subcommandP =
     (\itmCol descInd s -> case s ^. subcommandIndent of
         Just _  -> pure ()
         Nothing ->
-          modify (set subcommandIndent (Just (ItemIndent itmCol descInd)))
+          modify (set (guess . subcommandIndent)
+                  (Just (ItemIndent itmCol descInd)))
     )
 
-subcommandTextP :: MonadParsec e Text m => m Text
-subcommandTextP =
+subcommandTextP :: (MonadParsec e Text m, MonadState PS m) => m Text
+subcommandTextP = do
+  pti <- gets (view curPlainIndent)
+  curInd <- getIndent
+  -- If we know we are in a text block, then it would better to assume that if
+  -- we are sticking to the same indentation, we're still in the text block,
+  -- instead of trying to parse the following as a subcommand.
+  guard (pti /= Just curInd)
   lookAhead letterChar *> takeWhile1P Nothing (\c -> c == '-' || isAlphaNum c)
 
 ------------------------------------------------------------
 -- *** Flags
 
-flagP :: (MonadParsec e Text m, MonadState IndentGuess m) => m Item
+flagP :: (MonadParsec e Text m, MonadState PS m) => m Item
 flagP =
   twoColumn
     Flag
@@ -196,7 +214,7 @@ flagP =
             -- encountering the shallow indented flag.
             GT -> save id (Just fi{itemIndent = itmInd}, Just fi_ii)
     )
-   where save lx v = modify (set (flagIndent . lx) v)
+   where save lx v = modify (set (guess . flagIndent . lx) v)
 
 flagTextP :: MonadParsec e Text m => m Text
 flagTextP = do
@@ -216,7 +234,7 @@ flagTextP = do
 -- *** Helper functions
 
 twoColumn
-  :: (MonadParsec e Text m, MonadState IndentGuess m)
+  :: (MonadParsec e Text m, MonadState PS m)
   => TableType
   -> m Text                                      -- ^ Item parser
   -> (IndentGuess -> NonEmpty (Maybe Int))       -- ^ Item alignments
@@ -227,7 +245,7 @@ twoColumn tt itemP getSavedItemIndents lx saveIndents = do
   -- First get the item
   space1
   itmInd <- getIndent
-  s <- get
+  s <- gets (view guess)
   let itmIndents = getSavedItemIndents s
   guard (any (`isNothingOrJustEq` itmInd) $ NE.toList itmIndents)
   itm <- itemP
@@ -237,6 +255,7 @@ twoColumn tt itemP getSavedItemIndents lx saveIndents = do
   desc <- descriptionP descInd (fmap descIndent (s ^. lx))
   -- Save indentations (if applicable)
   saveIndents itmInd descInd s
+  modify (set curPlainIndent Nothing)
   -- Done
   pure (Tabular tt (pure (TableEntry itm desc)) (ItemIndent itmInd descInd))
 
@@ -266,7 +285,9 @@ descriptionP descInd savedDescIndent = do
   pure (T.intercalate " " (firstLine : nextLines))
   where
     descrLine =
-      lookAhead (notChar '[') *> takeWhile1P Nothing (/= '\n') <* (void newline <|> eof)
+      lookAhead (notChar '[')
+      *> takeWhile1P Nothing (/= '\n')
+      <* (void newline <|> eof)
 
 isNothingOrJustEq :: Eq a => Maybe a -> a -> Bool
 isNothingOrJustEq Nothing  _ = True
