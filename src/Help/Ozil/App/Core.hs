@@ -25,7 +25,8 @@ module Help.Ozil.App.Core
 import Commons hiding (to)
 
 import Help.Page
-  (getNewSubcommand, highlightedSubcommand, LinkState, mkLinkStateOff, DocPage)
+  (getNewSubcommand, highlightedSubcommand, LinkState, mkLinkStateOff, DocPage
+  , displayHeading)
 import Help.Ozil.App.Config.Watch (WatchManager, FSEvent)
 import Help.Ozil.App.Config.Types (Config)
 import Help.Ozil.App.Cmd (optCommand, Options, HasDebugMode(..), _Default)
@@ -117,6 +118,6 @@ newOState opts wm ch dp cfg = OState
   , _oStateViews     = F.singleton (mkView dp)
   , _oStateWatch     = Uninitialized wm
   , oStateChan       = ch
-  , _oStateHeading   = "binaryname"
+  , _oStateHeading   = pack (displayHeading dp)
   , _oStateDebugMode = fromMaybe False (opts ^? optCommand._Default.debugMode)
   }

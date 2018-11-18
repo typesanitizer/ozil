@@ -6,6 +6,7 @@ module Help.Page
   , parseManPage
   , DocPageSummary (..)
   , displayDocPageSummary
+  , displayHeading
   , ManPageSummary (..)
   , parseManPageSummary
   , HelpPageSummary (..)
@@ -80,8 +81,16 @@ displayHelpPageSummary (HelpPageSummary bp scp sh _) =
 
 displayDocPageSummary :: DocPage -> String
 displayDocPageSummary = \case
-  Man mps _ -> show mps
+  Man mps _ -> displayManPageSummary mps
   Help hps _ -> displayHelpPageSummary hps
+
+displayManPageSummary :: ManPageSummary -> String
+displayManPageSummary = \case
+  WhatisDescr w -> w ^. name <> " " <> w ^. section
+  UnknownFormat s -> s
+
+displayHeading :: DocPage -> String
+displayHeading = displayDocPageSummary
 
 --------------------------------------------------------------------------------
 -- * Working with LinkState
