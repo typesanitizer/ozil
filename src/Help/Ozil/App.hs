@@ -43,9 +43,16 @@ oapp = Brick.App
   , appAttrMap = const $ Brick.attrMap Vty.defAttr
       [ ("subc-link", subc_attr)
       , ("subc-highlight", Vty.withStyle subc_attr Vty.standout)
+      , ("sec-heading", plain_bold)
+      , ("man-B", plain_bold)
+      , ("man-default", Vty.defAttr)
+      , ("man-I", plain_underline)
       ]
   }
-  where subc_attr = Vty.withStyle Vty.defAttr Vty.underline
+  where
+    plain_bold = Vty.withStyle Vty.defAttr Vty.bold
+    plain_underline = Vty.withStyle Vty.defAttr Vty.underline
+    subc_attr = plain_underline
 
 ozilStartEvent :: OState -> Brick.EventM OResource OState
 ozilStartEvent s = case s ^. watch of

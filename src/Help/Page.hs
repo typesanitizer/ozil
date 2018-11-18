@@ -55,6 +55,7 @@ import qualified Data.ByteString.Lazy as BS
 import qualified Data.Text.IO as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Vector.Generic as V
+import qualified Graphics.Vty as Vty
 
 --------------------------------------------------------------------------------
 -- * Parsing
@@ -201,7 +202,8 @@ renderManPage (ManPage (ManPageView _pre h _post sections fm) _) =
     each f = V.toList . V.imap f
     renderSection i (sh, _chnks) = vBox
       [renderSectionHeading sh, fmWrap (fm !!! i)]
-    renderSectionHeading = Brick.txt
+    renderSectionHeading =
+      Brick.modifyDefAttr (`Vty.withStyle` Vty.bold) . Brick.txt
 
 renderHelpPage :: LinkState -> HelpPage -> Widget n
 renderHelpPage ls HelpPage{_helpPageBody = v, _helpPageAnchors = a} =

@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Help.Page.Man
@@ -123,6 +124,9 @@ emptyManPage = ManPage
 --
 -- Any new insights should probably be documented on Unix.SE:
 -- https://unix.stackexchange.com/q/481025/89474
+--
+-- Also, it looks like man(1) and git(1) use totally different dialects of roff?
+-- But the share the same 'tbl' prepocessor? ...
 parseManPage :: Text -> ManPage
 parseManPage t =
   ManPage
@@ -158,8 +162,7 @@ parseManPage t =
     isComment = \case Heading _ -> False; Comment _ -> True;  Markup _ -> False
     isSectionHeading (Chunk d _) = d == Dir "SH"
 
-    chunkToFM (Chunk _ z) = (z, "subc-link" :: AttrName)
-    fm = V.map (mkFastMarkup . V.toList . fmap chunkToFM . snd) sections
+    fm = V.map (mkFastMarkup . V.toList . V.concatMap chunkToFM . snd) sections
 
     mkSections :: [Chunk] -> Vector (Text, Chunks)
     mkSections = V.fromList . catMaybes . chop
@@ -171,6 +174,28 @@ parseManPage t =
               error (printf "Found stray chunk %s even though it was supposed to be\
                             \ gobbled by a section heading." (show ch))
         )
+
+chunkToFM :: V.Vector v (Text, AttrName) => Chunk -> v (Text, AttrName)
+chunkToFM (Chunk d z) =
+  let z' = rewrite z
+      alt t a1 a2 = V.fromList
+        [ (x, a) | (i, x) <- zip [0 ..] (T.splitOn "\\|" t)
+                 , let a = if i `mod` 2 == 0 then a1 else a2
+        ]
+      res  = if
+        | d == Dir "B"  -> solo z' "man-B"
+        | d == Dir "I"  -> solo z' "man-I"
+        | d == Dir "RB" -> alt  z' "man-default" "man-B"
+        | d == Dir "BR" -> alt  z' "man-B" "man-default"
+        | d == Dir "RI" -> alt  z' "man-default" "man-I"
+        | d == Dir "IR" -> alt  z' "man-I" "man-default"
+        | d == Dir "br" -> solo "\n" "man-default"
+        | z' == "\\&.\\|.\\|.\\&" -> solo "..." "man-default"
+        | otherwise     -> solo z' "man-default"
+  in res
+  where
+    solo = curry V.singleton
+    rewrite = T.replace "\\-" "-"
 
 coalesceChunks :: [Chunk] -> Vector Chunk
 coalesceChunks = V.fromList . chop groupConcat
@@ -213,7 +238,8 @@ manPageLineP line_num =
   <|> startsWithDotP
   <|> fallbackP
   where
-    fallbackP = Markup . Chunk None <$> takeWhile1P' (const True)
+    -- This T.cons seems hacky...
+    fallbackP = Markup . Chunk None . T.cons ' ' <$> takeWhile1P' (const True)
     fullLine = takeWhileP Nothing (const True)
     commentP = Comment <$> try (string "\\\"" *> fullLine)
     startsWithDotP =
