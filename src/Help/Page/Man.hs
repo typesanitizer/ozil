@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies    #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Help.Page.Man
   ( WhatisDescription (..)
@@ -11,6 +11,10 @@ module Help.Page.Man
   , Chunk (Chunk)
   , parseManPage
   , manHeadingP
+
+  , manPageLineP
+  , ManPageLine (..)
+  , Chunks
   ) where
 
 import Commons
@@ -21,10 +25,10 @@ import Control.Monad.State.Strict
 import Text.Megaparsec hiding (State)
 import Text.Megaparsec.Char
 
-import Data.Char (isAlphaNum)
-import Data.Either (fromRight)
+import Data.Char (isSpace, isAlphaNum)
 import Data.HashSet (HashSet)
 import Data.List.Split (chop)
+import Lens.Micro ((%~))
 
 import qualified Data.Text as T
 import qualified Data.HashSet as Set
@@ -60,19 +64,22 @@ data Heading = ManHeading
   , _headingDate    :: !Text
   , _headingSource  :: !Text
   , _headingManual  :: !Text
-  } deriving Show
+  } deriving (Eq, Show)
 
 emptyHeading :: Heading
 emptyHeading = ManHeading "" "" "" "" ""
 
 manHeadingP :: MonadParsec e Text m => m Heading
 manHeadingP = do
-  _headingTitle <- lexeme binNameP
-  _headingSection <- lexeme secNumP
-  _headingDate <- lexeme quoted
-  _headingSource <- lexeme quoted
-  _headingManual <- quoted
+  -- Why the hell does Data.List not have a safe indexing operator.
+  chunks <- V.fromList <$> some ((quoted <|> takeWhile1P' (not . isSpace)) <* space)
   void (space *> optional eof)
+  let at i = fromMaybe "" ((chunks :: Vector Text) V.!? i)
+      _headingTitle = at 0
+      _headingSection = at 1
+      _headingDate = at 2
+      _headingSource = at 3
+      _headingManual = at 4
   pure $ ManHeading
     { _headingTitle
     , _headingSection
@@ -93,9 +100,10 @@ data ManPage = ManPage
   }
 
 data ManPageView = ManPageView
-  { _manPageViewHeading :: !Heading
+  { _manPagePreHeading  :: !Chunks
+  , _manPageViewHeading :: !Heading
+  , _manPagePostHeading :: !Chunks
   , _manPageViewSection :: !(Vector (Text, Chunks))
-  , _manPageViewRest    :: !Text
   , _manPageFastMarkup  :: !(Vector (FastMarkup Brick.AttrName))
   }
 
@@ -106,7 +114,7 @@ data ManPageMetadata = ManPageMetadata
 
 emptyManPage :: ManPage
 emptyManPage = ManPage
-  (ManPageView emptyHeading mempty "" undefined)
+  (ManPageView mempty emptyHeading mempty mempty mempty)
   (ManPageMetadata mempty mempty)
 
 -- Ossanna and Kernighan's "Troff User's manual" seems to at least have the
@@ -118,78 +126,64 @@ emptyManPage = ManPage
 parseManPage :: Text -> ManPage
 parseManPage t =
   ManPage
-  (ManPageView h sections t fm)
-  (ManPageMetadata (V.fromList inp) (V.reverse $ V.fromList ps))
+  (ManPageView preHeading theHeading postHeading sections fm)
+  (ManPageMetadata (V.fromList inputLines) (V.reverse $ V.fromList finalPS))
   where
-    fm = V.singleton $ mkFastMarkup
-      [ ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      , ("Twinkle twinkle little star, how I wonder what you are.", "subc-link")
-      ]
-    -- fm = V.map (mkFastMarkup . V.toList
-    --             . fmap ((,"subc-link" :: AttrName) . (\(Chunk z _) -> z)) . snd)
-    --      sections
-    sections = mkSections rets'
-    inp = T.lines t
-    (rets, PS ps) =
-      flip runState (PS [])
-      $ traverse (\(i, line) -> runParserT (manPageLineP i) "" line)
-      $ zip [0..] inp
-    errmsg i v = printf "man page line %d parse error " i ++ show v
-    -- TODO: Too many partial functions and incomplete matches here :(
-    (tmp', tmp) = break isHeading
-      $ zipWith (\i v -> fromRight (error (errmsg i v)) v) [1 :: Int ..] rets
+    inputLines = T.lines t
 
-    assertNoMoreHeadings xs = assert (not $ any isHeading xs) xs
+    (fullParseResult, PS finalPS) =
+      zip [1 ..] inputLines
+      & traverse (\(i, line) -> runParserT (manPageLineP i) "" line)
+      & flip runState (PS [])
+      & _1 %~ sequenceA
 
-    (Heading h, rets') = case tmp of
-      (Heading h' : rest) -> (Heading h', assertNoMoreHeadings rest)
-      _ -> error (show (take 20 tmp') ++ "\n" ++ show (take 10 tmp))
+    parsedLines = filter (not . isComment)
+      $ either (error . show) id fullParseResult
 
-    isHeading = \case Heading _ -> True; _ -> False
-    isSH = \case (Markup (Chunk  _ (Dir "SH"))) -> True; _ -> False
+    coerceMarkup = \case
+      Markup c -> c
+      z -> error ("Expected markup but found " <> show z)
 
-    getTxt (Markup (Chunk z _)) = z
-    getTxt _ = error "unreachable"
+    (preHeading, theHeading, postHeading, sections) =
+      let (pre, Heading h : rest) = case break isHeading parsedLines of
+            (x, y@(Heading _ : _)) -> (x, y)
+            (x, y) -> error ("Expected heading. Got something else :(\n"
+                             <> show (take 20 x) <> "\n" <> show (take 10 y))
+          (post, secs) = break isSectionHeading $ map coerceMarkup rest
+      in (makePreHeading pre, h, makePostHeading post, mkSections secs)
 
-    getChunks = catMaybes . chop groupConcat
-    groupConcat [] = error "unreachable in chop"
-    groupConcat (chk : chks) = case chk of
-      Markup (Chunk txt d) ->
-        let (grp, rest) = span (\case Markup (Chunk _ d') -> d' == d; _ -> False) chks in
-          let txts = map getTxt grp in
-          (Just (Chunk (T.intercalate " " (txt : txts)) d), rest)
-      Comment _ -> (Nothing, chks)
-      Heading _ -> error "Heading should not have existed here."
+    makePreHeading = coalesceChunks . map coerceMarkup
+    makePostHeading = coalesceChunks
+    isHeading = \case Heading _ -> True;  Comment _ -> False; Markup _ -> False
+    isComment = \case Heading _ -> False; Comment _ -> True;  Markup _ -> False
+    isSectionHeading (Chunk d _) = d == Dir "SH"
 
-    mkSections :: [ManPageLine] -> Vector (Text, Chunks)
+    chunkToFM (Chunk _ z) = (z, "subc-link" :: AttrName)
+    fm = V.map (mkFastMarkup . V.toList . fmap chunkToFM . snd) sections
+
+    mkSections :: [Chunk] -> Vector (Text, Chunks)
     mkSections = V.fromList . catMaybes . chop
-      (\(l:ls) -> case l of
-          Markup (Chunk sh (Dir "SH")) ->
-            let (chks, rest) = break isSH ls
-            in (Just (sh, V.fromList (getChunks chks)), rest)
-          Markup (Chunk _ (Dir _)) -> error "Dir s. s /= \"SH\". \
-                                            \This should've been gobbled by SH"
-          Markup (Chunk _ None) -> error "Dir = None. \
-                                         \This should've been gobbled by SH"
-          Comment _ -> (Nothing, ls)
-          Heading _ -> error "Heading should not have existed here."
-      )
+        (\(ch:chs) -> case ch of
+            Chunk (Dir "SH") sh ->
+              let (chks, rest) = break isSectionHeading chs
+              in (Just (sh, coalesceChunks chks), rest)
+            Chunk _ _ ->
+              error (printf "Found stray chunk %s even though it was supposed to be\
+                            \ gobbled by a section heading." (show ch))
+        )
+
+coalesceChunks :: [Chunk] -> Vector Chunk
+coalesceChunks = V.fromList . chop groupConcat
+  where
+    groupConcat [] = error "unreachable in chop"
+    groupConcat (Chunk d txt : chks) =
+        let (txts, rest) = flip mapSpan chks $ \(Chunk d' z) ->
+              if d' == d then Just z
+              else Nothing
+        in (Chunk d (T.intercalate " " (txt : txts)), rest)
+    mapSpan f xs =
+      let (pre, post) = span (isJust . fst) (zip (map f xs) xs)
+      in (map (fromMaybe (error "unreachable") . fst) pre, map snd post)
 
 --------------------------------------------------------------------------------
 -- * Helper functions
@@ -215,11 +209,11 @@ newtype PS = PS {unrecognized :: [Int]}
 
 manPageLineP :: Int -> Parser ManPageLine
 manPageLineP line_num =
-  (eof *> pure (Markup (Chunk "" None)))
+  (eof *> pure (Markup (Chunk None "")))
   <|> startsWithDotP
   <|> fallbackP
   where
-    fallbackP = fmap Markup . Chunk <$> takeWhile1P' (const True) <*> pure None
+    fallbackP = Markup . Chunk None <$> takeWhile1P' (const True)
     fullLine = takeWhileP Nothing (const True)
     commentP = Comment <$> try (string "\\\"" *> fullLine)
     startsWithDotP =
@@ -233,13 +227,13 @@ manPageLineP line_num =
                let recognized = dir `Set.member` knownDirectives
                unless recognized
                  $ modify (\ps -> ps{unrecognized = line_num : unrecognized ps})
-               pure (Markup (Chunk txt (Dir dir)))
+               pure (Markup (Chunk (Dir dir) txt))
             -- TODO: The following line doesn't make any sense.
             <|> fallbackP
             )
           )
 
-data Chunk = Chunk !Text !Directive
+data Chunk = Chunk !Directive !Text
   deriving Show
 
 type Chunks = Vector Chunk

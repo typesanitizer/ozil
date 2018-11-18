@@ -192,17 +192,15 @@ render ls = \case
   Help _ h -> renderHelpPage ls h
 
 renderManPage :: ManPage -> Widget n
-renderManPage (ManPage (ManPageView h sections _ fm) _) =
+renderManPage (ManPage (ManPageView _pre h _post sections fm) _) =
   Brick.str (show $ getSum (foldMap (Sum . V.length . snd) sections))
   ===
   vBox (renderHeading h : each renderSection sections)
   where
     renderHeading = const emptyWidget
     each f = V.toList . V.imap f
-    -- TODO: unused index. This can be fixed once we get rid of the
-    -- Twinkle twinkle little star.
-    renderSection _i (sh, _chnks) = vBox
-      [renderSectionHeading sh, fmWrap (fm !!! 0)]
+    renderSection i (sh, _chnks) = vBox
+      [renderSectionHeading sh, fmWrap (fm !!! i)]
     renderSectionHeading = Brick.txt
 
 renderHelpPage :: LinkState -> HelpPage -> Widget n
