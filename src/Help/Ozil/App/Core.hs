@@ -106,7 +106,7 @@ getBChan = oStateChan
 
 newOState
   :: Options
-  -> Maybe WatchManager
+  -> WatchManager
   -> BChan OEvent
   -> DocPage
   -> Config
@@ -115,7 +115,7 @@ newOState opts wm ch dp cfg = OState
   { oStateOptions    = opts
   , _oStateConfig    = cfg
   , _oStateViews     = F.singleton (mkView dp)
-  , _oStateWatch     = maybe NoWatch Uninitialized wm
+  , _oStateWatch     = Uninitialized wm
   , oStateChan       = ch
   , _oStateHeading   = "binaryname"
   , _oStateDebugMode = fromMaybe False (opts ^? optCommand._Default.debugMode)

@@ -1,7 +1,10 @@
+{-# LANGUAGE DeriveAnyClass #-}
+
 module Help.Page.Internal where
 
-import Commons (Text)
+import Commons (Generic, Text)
 
+import Data.Aeson (FromJSON, ToJSON)
 import Help.Page.Help (HelpPage)
 import Help.Page.Man (ManPage (..), WhatisDescription (..))
 import Help.Subcommand (Subcommand)
@@ -32,10 +35,10 @@ data HelpPageSummary = HelpPageSummary
 data BinaryPath
   = Simple FilePath
   | Local BuildSystem BinName
-  deriving Eq
+  deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
 data BuildSystem = Stack | Cabal | Cargo
-  deriving Eq
+  deriving (Eq, Show, Generic, FromJSON, ToJSON)
 
 type BinName = String
 

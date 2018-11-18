@@ -7,6 +7,7 @@ module Commons
   , module Control.Monad.IO.Class
   , module Data.Coerce
   , module Data.Function
+  , module Data.HashMap.Strict
   , module Data.List.NonEmpty
   , module Data.Maybe
   , module Data.Pair
@@ -43,6 +44,7 @@ import Control.Monad (when, void, join, forM, forM_)
 import Control.Monad.IO.Class
 import Data.Coerce
 import Data.Function ((&), on)
+import Data.HashMap.Strict (HashMap)
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe
 import Data.Pair

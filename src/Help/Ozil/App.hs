@@ -13,6 +13,7 @@ import qualified Help.Page as Page
 import qualified Help.Ozil.App.Default as Default
 
 import Brick (App (..))
+import System.Directory (doesDirectoryExist)
 
 import qualified Brick
 import qualified Brick.BChan as BChan
@@ -24,9 +25,10 @@ import qualified System.FSNotify as FSNotify
 main :: IO ()
 main = defaultMain $ \opts -> do
   (dp, cfg) <- finishStartup opts
-  -- FSNotify.withManager $ \wm -> do
-  chan <- BChan.newBChan maxChanSize
-  saveConfig $ Brick.customMain gui (Just chan) oapp (newOState opts Nothing chan dp cfg)
+  FSNotify.withManager $ \wm -> do
+    chan <- BChan.newBChan maxChanSize
+    saveConfig $
+      Brick.customMain gui (Just chan) oapp (newOState opts wm chan dp cfg)
   where
     gui = Vty.mkVty Vty.defaultConfig
     maxChanSize = 20
@@ -51,9 +53,13 @@ ozilStartEvent s = case s ^. watch of
   Running _ -> pure s
   Uninitialized wm -> do
     sw <- liftIO $
-      FSNotify.watchDir wm Default.configDir toReactOrNotToReact forwardEvent
-    pure (set watch (Running sw) s)
+      doesDirectoryExist ozilDir >>= \case
+        False -> pure NoWatch
+        True -> Running
+          <$> FSNotify.watchDir wm ozilDir toReactOrNotToReact forwardEvent
+    pure (set watch sw s)
   where
+    ozilDir = Default.configDir
     forwardEvent :: FSEvent -> IO ()
     forwardEvent = BChan.writeBChan (getBChan s) . OEvent
 
@@ -75,16 +81,19 @@ handleEvent s = \case
         _ -> pure 0
     when (scrollAmt /= 0)
       $ Brick.vScrollBy (Brick.viewportScroll TextViewport) scrollAmt
-    let chLS = case ev of
+    let changeLinkState = case ev of
           KeyPress (Vty.KChar 'f') -> Page.flipLinkState
           KeyPress (Vty.KChar 'n') -> Page.mapLinkState (+1)
           KeyPress (Vty.KChar 'p') -> Page.mapLinkState (subtract 1)
           _ -> id
-    let chDS = case ev of
+    let changeDocState = case ev of
           KeyPress' (Vty.KChar 'n') [Vty.MCtrl] -> pushDoc
+          KeyPress  Vty.KEnter                  -> pushDoc
+
           KeyPress' (Vty.KChar 'p') [Vty.MCtrl] -> pure . popDoc
+          KeyPress  Vty.KBS                     -> pure . popDoc
           _ -> pure
-    s' <- liftIO (chDS (over linkState chLS s))
+    s' <- liftIO (changeDocState (over linkState changeLinkState s))
     Brick.continue s'
   where
     stopProgram = do
@@ -145,8 +154,8 @@ viewerUI s =
     keyBindings1 = "Esc/q = Exit  k/↑ = Up  C-u = Up!  j/↓ = Down  C-d = Down!"
     keyBindings2 =
       if s ^. linkState & Page.isOn then
-        "f = Turn off hints  n = Next hint  p = Previous hint\n\
-        \                  C-n = Follow   C-p = Go back"
+        "f = Turn off hints   n = Next hint   p = Previous hint\n\
+        \                 C-n/↵ = Follow  C-p/← = Go back"
       else
         "f = Turn on hints"
     header = T.snoc (T.cons ' ' (s ^. heading)) ' '

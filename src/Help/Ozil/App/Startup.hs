@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module Help.Ozil.App.Startup
   ( finishStartup
@@ -43,7 +44,8 @@ finishStartup :: Options -> IO (DocPage, Config)
 finishStartup o = do
   (dps, cfg) <- runStartup o Default.config (getConfig >> getCandidates)
   case dps of
-    []   -> error "Empty list"
+    []   -> error "There were no candidates for the page that you search for.\n\
+                  \Perhaps you made a typo?"
     [dp] -> (, cfg) . fromMaybe err <$> getDocPage dp
     h:tl -> do
       (dp, ss) <- runSelectionApp (h:|tl)
@@ -130,8 +132,9 @@ runSelectionApp dps = do
   let len = NE.length dps
   i <- Brick.defaultMain (selectionApp len dps) 0
   let dp = assert (0 <= i && i < len) (dps NE.!! i)
-  ss <- Brick.defaultMain (saveSelectionApp dp) DontSave
-  pure (dp, ss)
+  -- TODO: We should use this app and then save the configuration.
+  -- ss <- Brick.defaultMain (saveSelectionApp dp) DontSave
+  pure (dp, DontSave)
 
 highlightSelection :: Brick.AttrMap
 highlightSelection = Brick.attrMap Vty.defAttr
@@ -193,7 +196,8 @@ saveSelectionAppDraw :: p -> SaveSelection -> [Brick.Widget n]
 saveSelectionAppDraw _ ss =
   [ W.renderGDialog
     ( W.HDialog $ W.dialog
-      (Just " Would you like to save this choice for the future? ")
+      (Just " Would you like to save this choice for the future? \n\
+            \ (Sorry, this doesn't actually work at the moment.) ")
       (Just (fromEnum ss, buttons))
       60
     ) W.emptyWidget
