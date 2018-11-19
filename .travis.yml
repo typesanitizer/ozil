@@ -55,7 +55,6 @@ install:
       stack setup --no-terminal
       stack ghc -- --version
       stack build --only-dependencies --no-terminal
-      stack install hlint
     fi
 
 script:
@@ -65,7 +64,6 @@ script:
       cabal v2-haddock
     else
       stack build --test --bench --no-run-benchmarks --no-terminal
-      hlint .
     fi
 
 notifications:

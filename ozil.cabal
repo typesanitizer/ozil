@@ -85,6 +85,8 @@ library
           Help.Page.Internal
           Help.Page.Lenses
           Help.Page.Man
+              Help.Page.Man.Internal
+              Help.Page.Man.Parse
       Help.Ozil.App
           Help.Ozil.App.Cmd
               Help.Ozil.App.Cmd.Parser

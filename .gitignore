@@ -2,4 +2,5 @@
 *~
 .dir-locals.el
 dist-newstyle
+dist
 .ghc.environment.*
