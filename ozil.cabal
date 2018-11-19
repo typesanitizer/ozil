@@ -157,4 +157,5 @@ test-suite ozil-test
       Brick.FastMarkupSpec
       Help.Page.HelpSpec
       Help.Page.ManSpec
+          Help.Page.Man.ParseSpec
   default-language: Haskell2010
