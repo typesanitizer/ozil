@@ -15,7 +15,7 @@ import Help.Ozil.App.Startup.Core
 import Help.Page.Lenses (name, section, shortDescription)
 import Help.Ozil.App.Config (getConfig, Config)
 
-import qualified Help.Ozil.App.Default as Default
+import qualified Help.Ozil.App.Config.Default as Default
 
 import System.FilePath
 

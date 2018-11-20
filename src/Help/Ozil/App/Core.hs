@@ -1,5 +1,5 @@
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE FunctionalDependencies     #-}
+{-# LANGUAGE UndecidableInstances   #-}
+{-# LANGUAGE TemplateHaskell        #-}
 
 module Help.Ozil.App.Core
   (
@@ -28,7 +28,8 @@ import Help.Page
   (getNewSubcommand, highlightedSubcommand, LinkState, mkLinkStateOff, DocPage
   , displayHeading)
 import Help.Ozil.App.Config.Watch (WatchManager, FSEvent)
-import Help.Ozil.App.Config.Types (Config)
+import Help.Ozil.App.Config.Types
+  (Config, HasKeyBindings (..), KeyBindings, userConfig)
 import Help.Ozil.App.Cmd (optCommand, Options, HasDebugMode(..), _Default)
 
 import Brick (App (..))
@@ -78,6 +79,9 @@ instance HasDoc OState DocPage where
 
 instance HasLinkState OState LinkState where
   linkState = views . F.focusL . linkState
+
+instance HasKeyBindings OState KeyBindings where
+  keyBindings = config . userConfig . keyBindings
 
 --------------------------------------------------------------------------------
 -- * Operations

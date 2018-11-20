@@ -1,40 +1,29 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Help.Ozil.App.Config.Types where
+module Help.Ozil.App.Config.Types
+  ( module Help.Ozil.App.Config.Types
+  , KeyBindings
+  ) where
 
 import Commons
-import Help.Page (BinaryPath)
+import Help.Ozil.App.Config.Types.Core
 
-import Data.Aeson.TH (deriveJSON, defaultOptions, Options (..))
 import Lens.Micro (Lens')
 import Lens.Micro.TH (makeLenses)
 
-data SystemInfo = SystemInfo
-  { _ozilConfigFileExists :: !(Maybe FilePath)
-  , _ozilDbExists         :: () -- ^ Unused for now
-  } deriving Show
+type V = 'V1_0
 
-data Choice = Choice
-  { _options :: NonEmpty BinaryPath
-  , _choice  :: Int
-  } deriving Show
+type SystemInfo = SystemInfoF V
+type Choice = ChoiceF V
+type UserConfig = UserConfigF V
+type Config = ConfigF V
 
-data UserConfig = UserConfig
-  { _savedSelection :: HashMap Text Choice
-  , _databasePath   :: () -- ^ Unused for now
-  } deriving Show
-
-data Config = Config
-  { _userConfig :: !UserConfig
-  , _systemInfo :: !SystemInfo
-  } deriving Show
-
-makeLenses ''SystemInfo
-makeLenses ''Choice
-$(deriveJSON defaultOptions{fieldLabelModifier = drop 1} ''Choice)
-$(deriveJSON defaultOptions{fieldLabelModifier = drop 1} ''UserConfig)
-makeLenses ''UserConfig
-makeLenses ''Config
+makeLenses ''SystemInfoV1_0
+makeFieldsNoPrefix ''ChoiceV1_0
+makeFieldsNoPrefix ''UserConfigV1_0
+makeLenses ''ConfigV1_0
 
 configFileExists :: Lens' Config (Maybe FilePath)
 configFileExists = systemInfo . ozilConfigFileExists

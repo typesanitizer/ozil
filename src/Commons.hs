@@ -8,6 +8,7 @@ module Commons
   , module Data.Coerce
   , module Data.Function
   , module Data.HashMap.Strict
+  , module Data.Kind
   , module Data.List.NonEmpty
   , module Data.Maybe
   , module Data.Pair
@@ -20,7 +21,10 @@ module Commons
   , module GHC.Stack
   , module Lens.Micro
   , module Lens.Micro.Mtl
-  , module Lens.Micro.TH
+  -- specific exports from Lens.Micro.TH
+  , makeLenses
+  , makeFields
+  , makeFieldsNoPrefix
   , module Text.Printf
   , readProcessSimple
   , headMaybe
@@ -35,16 +39,22 @@ module Commons
   )
   where
 
+import Language.Haskell.TH (mkName, nameBase, Name, DecsQ)
+
 import Control.DeepSeq (force, NFData(..))
 import Control.Exception (assert)
-import Lens.Micro ((^.), (^?), (<&>), set, over, _1, _2)
+import Lens.Micro ((.~), (^.), (^?), (<&>), set, over, _1, _2)
 import Lens.Micro.Mtl (view)
-import Lens.Micro.TH (makeFields)
+import Lens.Micro.TH
+  (DefName (MethodName), makeLenses, camelCaseFields, lensField, makeLensesWith
+  , makeFields)
 import Control.Monad (when, void, join, forM, forM_)
 import Control.Monad.IO.Class
+import Data.Char (toLower, toUpper)
 import Data.Coerce
 import Data.Function ((&), on)
 import Data.HashMap.Strict (HashMap)
+import Data.Kind
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.Maybe
 import Data.Pair
@@ -100,3 +110,13 @@ takeWhile1P' = takeWhile1P Nothing
 (!!!) :: HasCallStack => V.Vector v a => v a -> Int -> a
 (!!!) v i = fromMaybe err $ v V.!? i
   where err = error (printf "OOB indexing! i = %d, vlen = %d" i (V.length v))
+
+makeFieldsNoPrefix :: Name -> DecsQ
+makeFieldsNoPrefix =
+  makeLensesWith (camelCaseFields & lensField .~ (
+                     \_ _ n -> case nameBase n of
+                       '_':x:xs -> [MethodName
+                                    (mkName ("Has" ++ toUpper x : xs))
+                                    (mkName (toLower x : xs))
+                                   ]
+                       _        -> []))

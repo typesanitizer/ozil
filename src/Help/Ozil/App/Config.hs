@@ -27,7 +27,7 @@ import System.FilePath (takeDirectory)
 import qualified Data.Text as T
 import qualified Data.ByteString as BS
 import qualified Help.Ozil.App.Config.Types as Conf
-import qualified Help.Ozil.App.Default as Default
+import qualified Help.Ozil.App.Config.Default as Default
 
 -- TODO: Draw a state diagram of possible transitions and refactor helper
 -- functions appropriately. Right now, the linear flow is misleading, and

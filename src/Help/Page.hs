@@ -226,6 +226,7 @@ renderHelpPage ls HelpPage{_helpPageBody = v, _helpPageAnchors = a} =
         itemWidget = highlight (txtWrapWith ws item)
         descWidget = hBox [extraIndent, hLimit (itemFits 55 66) $ txtWrap desc]
         gap = descIndent - itemWidth - itemIndent
+        itemFits :: a -> a -> a
         itemFits tb fb = if gap > 0 then tb else fb
         itemWidth = textWidth item
         highlight = case ls of

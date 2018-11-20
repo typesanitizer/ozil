@@ -2,15 +2,20 @@
 
 This module should be imported qualified.
 -}
-module Help.Ozil.App.Default where
+module Help.Ozil.App.Config.Default where
 
+import Help.Ozil.App.KeyBinding
 import Help.Ozil.App.Config.Types
+import Help.Ozil.App.Config.Types.Core
 
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.String (IsString)
+import Graphics.Vty.Input (Key (..), Modifier (..))
 import System.Directory (getHomeDirectory)
 import System.FilePath ((</>))
 import System.IO.Unsafe (unsafePerformIO)
 
+import qualified Data.List.NonEmpty as NE
 import qualified Data.HashMap.Strict as H
 
 -- unsafePerformIO might give wrong results if the person changes
@@ -43,13 +48,28 @@ displayDbFilePath = displayConfigDir </> dbFile
 
 config :: Config
 config =
-  Config
-    { _systemInfo = SystemInfo
+  ConfigV1_0
+    { _systemInfo = SystemInfoV1_0
       { _ozilConfigFileExists = Nothing
       , _ozilDbExists = ()
       }
-    , _userConfig = UserConfig
-      { _savedSelection = H.empty
+    , _userConfig = UserConfigV1_0
+      { _savedPreferences = H.empty
+      , _keyBindings = defaultKeyBindings
       , _databasePath = ()
       }
     }
+
+defaultKeyBindings :: H.HashMap Action (NonEmpty KeyBinding)
+defaultKeyBindings = H.fromList
+  . map (fmap (NE.fromList . map (uncurry mkBinding))) $
+  [ (ScrollUp,           [(KChar 'k', []), (KUp,   [])])
+  , (ScrollDown,         [(KChar 'j', []), (KDown, [])])
+  , (ScrollUpHalfPage,   [(KChar 'u', [MCtrl])])
+  , (ScrollDownHalfPage, [(KChar 'd', [MCtrl])])
+  , (LinkFollow,         [(KChar 'n', [MCtrl]), (KEnter, [])])
+  , (LinkGoBack,         [(KChar 'p', [MCtrl]), (KBS,    [])])
+  , (LinkJumpNext,       [(KChar 'n', [])])
+  , (LinkJumpPrevious,   [(KChar 'p', [])])
+  , (ExitProgram,        [(KEsc, []), (KChar 'q', [])])
+  ]

@@ -1,3 +1,4 @@
+{-# LANGUAGE UndecidableInstances       #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -17,7 +18,7 @@ module Help.Ozil.App.Startup.Core
 
 import Commons
 
-import Help.Ozil.App.Config.Types (Config (..))
+import Help.Ozil.App.Config.Types (Config)
 import Help.Ozil.App.Cmd (Command, HasOptCommand (..), Options)
 
 import Control.Monad.Reader (ask, MonadReader, ReaderT, runReaderT)

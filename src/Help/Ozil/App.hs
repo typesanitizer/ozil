@@ -10,7 +10,7 @@ import Help.Ozil.App.Startup (finishStartup)
 import Help.Page.Lenses (indents, anchors, tableIxs, helpPage)
 
 import qualified Help.Page as Page
-import qualified Help.Ozil.App.Default as Default
+import qualified Help.Ozil.App.Config.Default as Default
 
 import Brick (App (..))
 import System.Directory (doesDirectoryExist)

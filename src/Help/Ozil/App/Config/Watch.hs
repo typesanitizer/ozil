@@ -7,7 +7,7 @@ module Help.Ozil.App.Config.Watch
 
 import System.FSNotify (WatchManager, Event (..), ActionPredicate)
 
-import qualified Help.Ozil.App.Default as Default
+import qualified Help.Ozil.App.Config.Default as Default
 
 type FSEvent = Event
 

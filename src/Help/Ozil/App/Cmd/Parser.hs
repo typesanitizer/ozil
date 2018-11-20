@@ -12,7 +12,7 @@ import Options.Applicative
 import System.FilePath (isPathSeparator, takeExtension)
 import Text.Printf (printf)
 
-import qualified Help.Ozil.App.Default as Default
+import qualified Help.Ozil.App.Config.Default as Default
 
 -- | Top-level runner
 defaultMain :: (Options -> IO b) -> IO b

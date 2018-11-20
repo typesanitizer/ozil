@@ -31,6 +31,7 @@ library
                       FlexibleContexts
                       MultiParamTypeClasses
                       FunctionalDependencies
+                      TypeFamilies
                       BangPatterns
                       LambdaCase
                       NamedFieldPuns
@@ -92,12 +93,14 @@ library
               Help.Ozil.App.Cmd.Parser
               Help.Ozil.App.Cmd.Types
           Help.Ozil.App.Config
+              Help.Ozil.App.Config.Default
               Help.Ozil.App.Config.Types
+                  Help.Ozil.App.Config.Types.Core
               Help.Ozil.App.Config.Watch
           Help.Ozil.App.Console.Text
           Help.Ozil.App.Core
           Help.Ozil.App.Death
-          Help.Ozil.App.Default
+          Help.Ozil.App.KeyBinding
           Help.Ozil.App.Startup
               Help.Ozil.App.Startup.Core
       Help.Subcommand
@@ -120,6 +123,7 @@ test-suite ozil-test
                       FlexibleContexts
                       MultiParamTypeClasses
                       FunctionalDependencies
+                      TypeFamilies
                       BangPatterns
                       LambdaCase
                       NamedFieldPuns
