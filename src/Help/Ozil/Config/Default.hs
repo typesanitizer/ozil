@@ -2,11 +2,11 @@
 
 This module should be imported qualified.
 -}
-module Help.Ozil.App.Config.Default where
+module Help.Ozil.Config.Default where
 
-import Help.Ozil.App.KeyBinding
-import Help.Ozil.App.Config.Types
-import Help.Ozil.App.Config.Types.Core
+import Help.Ozil.KeyBinding
+import Help.Ozil.Config.Types
+import Help.Ozil.Config.Types.Core
 
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.String (IsString)

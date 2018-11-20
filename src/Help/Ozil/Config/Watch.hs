@@ -1,4 +1,4 @@
-module Help.Ozil.App.Config.Watch
+module Help.Ozil.Config.Watch
   ( toReactOrNotToReact
   , FSEvent
   , module System.FSNotify
@@ -7,7 +7,7 @@ module Help.Ozil.App.Config.Watch
 
 import System.FSNotify (WatchManager, Event (..), ActionPredicate)
 
-import qualified Help.Ozil.App.Config.Default as Default
+import qualified Help.Ozil.Config.Default as Default
 
 type FSEvent = Event
 

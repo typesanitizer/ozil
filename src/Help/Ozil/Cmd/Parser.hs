@@ -1,18 +1,18 @@
-module Help.Ozil.App.Cmd.Parser
+module Help.Ozil.Cmd.Parser
   ( defaultMain
   ) where
 
 import Commons
 
 import Help.Subcommand (mkSubcommand)
-import Help.Ozil.App.Cmd.Types
+import Help.Ozil.Cmd.Types
 
 import Options.Applicative
 
 import System.FilePath (isPathSeparator, takeExtension)
 import Text.Printf (printf)
 
-import qualified Help.Ozil.App.Config.Default as Default
+import qualified Help.Ozil.Config.Default as Default
 
 -- | Top-level runner
 defaultMain :: (Options -> IO b) -> IO b

@@ -1,16 +1,16 @@
-module Help.Ozil.App where
+module Help.Ozil where
 
 import Commons
 
-import Help.Ozil.App.Cmd
-import Help.Ozil.App.Core
+import Help.Ozil.Cmd
+import Help.Ozil.Core
 
-import Help.Ozil.App.Config (FSEvent, toReactOrNotToReact)
-import Help.Ozil.App.Startup (finishStartup)
+import Help.Ozil.Config (FSEvent, toReactOrNotToReact)
+import Help.Ozil.Startup (finishStartup)
 import Help.Page.Lenses (indents, anchors, tableIxs, helpPage)
 
 import qualified Help.Page as Page
-import qualified Help.Ozil.App.Config.Default as Default
+import qualified Help.Ozil.Config.Default as Default
 
 import Brick (App (..))
 import System.Directory (doesDirectoryExist)

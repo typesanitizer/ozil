@@ -1,4 +1,4 @@
-module Help.Ozil.App.Console.Text
+module Help.Ozil.Console.Text
   ( warn
   , prompt
   , DefaultBool

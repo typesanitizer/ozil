@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveAnyClass #-}
 
-module Help.Ozil.App.KeyBinding
+module Help.Ozil.KeyBinding
   ( Action (..)
   , KeyBinding
   , mkBinding

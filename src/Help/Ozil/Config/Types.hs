@@ -2,13 +2,13 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module Help.Ozil.App.Config.Types
-  ( module Help.Ozil.App.Config.Types
+module Help.Ozil.Config.Types
+  ( module Help.Ozil.Config.Types
   , KeyBindings
   ) where
 
 import Commons
-import Help.Ozil.App.Config.Types.Core
+import Help.Ozil.Config.Types.Core
 
 import Lens.Micro (Lens')
 import Lens.Micro.TH (makeLenses)

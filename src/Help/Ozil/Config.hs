@@ -1,22 +1,22 @@
 {-# LANGUAGE RankNTypes      #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds -Wno-redundant-constraints #-}
 
-module Help.Ozil.App.Config
+module Help.Ozil.Config
   ( getConfig
   , saveConfig
-  , module Help.Ozil.App.Config.Watch
+  , module Help.Ozil.Config.Watch
   , Conf.Config
   )
   where
 
 import Commons
 
-import Help.Ozil.App.Config.Watch
-import Help.Ozil.App.Death
+import Help.Ozil.Config.Watch
+import Help.Ozil.Death
 
-import Help.Ozil.App.Cmd (configPath, optCommand, Command (..), ConfigOptions (..))
-import Help.Ozil.App.Console.Text (warn, prompt, pattern DefaultYes)
-import Help.Ozil.App.Startup.Core (options, modifyConfig, Startup)
+import Help.Ozil.Cmd (configPath, optCommand, Command (..), ConfigOptions (..))
+import Help.Ozil.Console.Text (warn, prompt, pattern DefaultYes)
+import Help.Ozil.Startup.Core (options, modifyConfig, Startup)
 
 import System.Directory
 
@@ -26,8 +26,8 @@ import System.FilePath (takeDirectory)
 
 import qualified Data.Text as T
 import qualified Data.ByteString as BS
-import qualified Help.Ozil.App.Config.Types as Conf
-import qualified Help.Ozil.App.Config.Default as Default
+import qualified Help.Ozil.Config.Types as Conf
+import qualified Help.Ozil.Config.Default as Default
 
 -- TODO: Draw a state diagram of possible transitions and refactor helper
 -- functions appropriately. Right now, the linear flow is misleading, and

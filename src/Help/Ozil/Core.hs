@@ -1,7 +1,7 @@
 {-# LANGUAGE UndecidableInstances   #-}
 {-# LANGUAGE TemplateHaskell        #-}
 
-module Help.Ozil.App.Core
+module Help.Ozil.Core
   (
   -- Core app
     OApp
@@ -27,10 +27,10 @@ import Commons hiding (to)
 import Help.Page
   (getNewSubcommand, highlightedSubcommand, LinkState, mkLinkStateOff, DocPage
   , displayHeading)
-import Help.Ozil.App.Config.Watch (WatchManager, FSEvent)
-import Help.Ozil.App.Config.Types
+import Help.Ozil.Config.Watch (WatchManager, FSEvent)
+import Help.Ozil.Config.Types
   (Config, HasKeyBindings (..), KeyBindings, userConfig)
-import Help.Ozil.App.Cmd (optCommand, Options, HasDebugMode(..), _Default)
+import Help.Ozil.Cmd (optCommand, Options, HasDebugMode(..), _Default)
 
 import Brick (App (..))
 import Brick.BChan (BChan)

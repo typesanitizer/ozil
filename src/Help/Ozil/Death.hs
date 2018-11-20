@@ -1,4 +1,4 @@
-module Help.Ozil.App.Death where
+module Help.Ozil.Death where
 
 import Commons
 

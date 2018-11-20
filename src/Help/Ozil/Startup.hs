@@ -1,21 +1,21 @@
 {-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
-module Help.Ozil.App.Startup
+module Help.Ozil.Startup
   ( finishStartup
   ) where
 
 import Commons
 
 import Help.Page
-import Help.Ozil.App.Cmd
-import Help.Ozil.App.Death
-import Help.Ozil.App.Startup.Core
+import Help.Ozil.Cmd
+import Help.Ozil.Death
+import Help.Ozil.Startup.Core
 
 import Help.Page.Lenses (name, section, shortDescription)
-import Help.Ozil.App.Config (getConfig, Config)
+import Help.Ozil.Config (getConfig, Config)
 
-import qualified Help.Ozil.App.Config.Default as Default
+import qualified Help.Ozil.Config.Default as Default
 
 import System.FilePath
 

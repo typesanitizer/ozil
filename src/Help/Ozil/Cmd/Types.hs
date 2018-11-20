@@ -1,8 +1,8 @@
 {-# LANGUAGE TemplateHaskell        #-}
 {-# LANGUAGE FunctionalDependencies #-}
 
-module Help.Ozil.App.Cmd.Types
-  ( module Help.Ozil.App.Cmd.Types
+module Help.Ozil.Cmd.Types
+  ( module Help.Ozil.Cmd.Types
   ) where
 
 import Commons

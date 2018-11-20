@@ -1,9 +1,9 @@
 {-# LANGUAGE DataKinds      #-}
 {-# LANGUAGE KindSignatures #-}
 
-module Help.Ozil.App.Config.Types.Core where
+module Help.Ozil.Config.Types.Core where
 
-import Help.Ozil.App.KeyBinding
+import Help.Ozil.KeyBinding
 
 import Data.Aeson
 
