@@ -1,6 +1,10 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ConstraintKinds #-}
 
+-- | The one deadly module.
+--
+-- We use the abbreviation TUM for Ossanna and Kernighan's Troff User's Manual.
+-- https://www.troff.org/54.pdf
 module Help.Page.Man.Parse where
 
 import Commons
@@ -19,15 +23,16 @@ import qualified Data.Text as T
 -- * Groff macros (based off man(7)) with troff
 --
 -- We use the term "directive" instead of command to avoid confusion with the
--- use of command to mean something else.
+-- use of command to mean something else in the context of the application.
 
 data PS = PS
   { connect :: !Bool
+  , ignore  :: !(Maybe Text) -- .ig yy (default yy = ".."). See TUM pg 6.
   , curFont :: !Font
   }
 
 initialPS :: PS
-initialPS = PS { connect = False, curFont = Roman }
+initialPS = PS { connect = False, ignore = Nothing, curFont = Roman }
 
 type PE = ParseError Char ()
 
@@ -46,21 +51,53 @@ data CharParseResult
 data Font = Bold | Italic | Roman
   deriving Eq
 
+data OpenBracket = Paren | Square
+
+eoiMsg :: String
+eoiMsg = "Unexpected end of input in the middle of an escape code."
+
+-- | The bracket escape codes are partly derived from TUM. The behaviour for
+-- square brackets is guessed based off the rendering of groff.1.
+bracketCase :: MonadChars e s m => OpenBracket -> m CharParseResult
+bracketCase brkt = label "in bracket char" $ do
+  ~(_:_:tl) <- lookAhead $ count' 4 5 C.anyChar
+  case tl of
+    [] -> unexpected (Tokens ('\\':|['('])) <?> eoiMsg
+    'e':'m':t -> one t '—' -- Em dash (U+2014)
+    'e':'n':t -> one t '–' -- En dash (U+2013)
+    'h':'y':t -> one t '-'
+    'o':'q':t -> one t '“' -- Left double quotation mark (U+201C), see man.1
+    'l':'q':t -> one t '“' -- Left double quotation mark (U+201C), see man.1
+    'c':'q':t -> one t '”' -- Right double quotation mark (U+201D), see man.1
+    'r':'q':t -> one t '”' -- Right double quotation mark (U+201D), see man.1
+    'm':'u':t -> one t '×' -- Multiplication sign (U+00D7)
+    'c':'o':t -> one t '©' -- Copyright sign (U+00A9)
+    c:cs -> unexpected (Tokens (c:|cs))
+  where
+    one t c = case brkt of
+      Paren -> pure (Consume 4 (T.singleton c))
+      Square -> case t of
+        [']'] -> pure (Consume 5 (T.singleton c))
+        _ -> unexpected (Tokens ('\\':|(['[', '.', '.'] ++ t)))
+
 -- | Parser for man page characters handling escape codes.
 --
 -- Very loosely based off 'Text.Megaparsec.Char.Lexer.charLiteral'.
 --
--- See page 7 in the Ossanna and Kernighan's Troff user manual for escape codes.
+-- See TUM (page 7) for escape codes.
 charLiteral :: MonadChars e s m => m CharParseResult
 charLiteral = label "man page char literal" $ do
   -- The @~@ is needed to avoid requiring a MonadFail constraint,
   -- and we do know that r will be non-empty if count' succeeds.
-  ~(x:y) <- lookAhead $ count' 1 4 C.anyChar
+  ~(x:y) <- lookAhead $ count' 1 2 C.anyChar
   case x of
     '\n' -> unexpected (Tokens ('\n':|[])) <?> "End of line"
     '\\' -> case y of
-      [] -> unexpected (Tokens ('\\':|[])) <?> eoi_msg
+      [] -> unexpected (Tokens ('\\':|[])) <?> eoiMsg
       '\\':_ -> unexpected (Tokens (x:|y)) <?> unimpl_msg
+      -- seems to mean a suggestion for the line-breaking suggest algorithm.
+      -- see in a URL in groff(1)
+      ':':_ -> pure (Consume 2 "")
       '`':_ -> one 2 '`'
       '\'':_ -> one 2 '´'
       '.':_ -> one 2 '.'
@@ -74,17 +111,8 @@ charLiteral = label "man page char literal" $ do
       '!':_ -> unexpected (Tokens ('!':|[])) <?> unimpl_msg
       '%':_ -> one 2 '-' -- hypenation using -
       -- '"':_ -> takeWhile1P' (const True) *> done
-      '(':z -> case z of
-        [] -> unexpected (Tokens ('\\':|['('])) <?> eoi_msg
-        "em" -> one 4 '—' -- Em dash (U+2014)
-        "en" -> one 4 '–' -- En dash (U+2013)
-        "hy" -> one 4 '-'
-        "oq" -> one 4 '“' -- Left double quotation mark (U+201C), c.f. man.1
-        "lq" -> one 4 '“' -- Left double quotation mark (U+201C), c.f. man.1
-        "cq" -> one 4 '”' -- Right double quotation mark (U+201D), c.f. man.1
-        "rq" -> one 4 '”' -- Right double quotation mark (U+201D), c.f. man.1
-        "mu" -> one 4 '×' -- Multiplication sign (U+00D7)
-        c:cs -> unexpected (Tokens (c:|cs))
+      '(':_ -> bracketCase Paren
+      '[':_ -> bracketCase Square
       'c':_ -> pure Connect
       'e':_ -> one 2 '\\' -- This is supposed to be the "current"
                           -- escape character, whatever that means.
@@ -100,21 +128,21 @@ charLiteral = label "man page char literal" $ do
     c -> one 1 c
   where
     one cnt c = pure (Consume cnt (T.singleton c))
-    eoi_msg = "Unexpected end of input in the middle of an escape code."
     unimpl_msg = "Don't know how to handle this case yet."
     font_msg = "A font needs to be specified here."
     unknown_font_msg = "Got an unknown font :(, expected B, I, R or P."
 
-consumeRestP :: MonadChars e s m => m a
-consumeRestP =
-  takeWhile1P' (/= '\n')
-  *> unexpected (Tokens ('!':|[]))
-  -- Finished consuming everything, fail now.
-  <?> "Ate up the whole comment!"
-
 space1NoNL :: MonadChars e s m => m ()
 space1NoNL = void (takeWhile1P (Just "space no newline")
                    (\c -> c /= '\n' && isSpace c))
+
+data NewlineResult = Leave1Space | NoSpace
+
+newline :: MonadRoff e s m => m NewlineResult
+newline = newline >> do
+  PS{connect} <- get
+  put initialPS
+  pure (if connect then NoSpace else Leave1Space)
 
 lexeme :: MonadParsec e Text m => m a -> m a
 lexeme = L.lexeme (L.space space1NoNL (L.skipLineComment "\\\"") empty)
