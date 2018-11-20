@@ -145,6 +145,7 @@ test-suite ozil-test
     , word-wrap
     , text
     , vector
+    , mtl
     , megaparsec
     -- testing specific stuff
     , hedgehog

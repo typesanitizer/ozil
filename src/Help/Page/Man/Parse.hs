@@ -5,9 +5,11 @@ module Help.Page.Man.Parse where
 
 import Commons
 
+import Data.Char (isSpace)
+
 import Control.Monad.State.Strict
-import Data.Char
 import Text.Megaparsec
+
 import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
@@ -19,9 +21,13 @@ import qualified Data.Text as T
 -- We use the term "directive" instead of command to avoid confusion with the
 -- use of command to mean something else.
 
-newtype PS = PS
-  { connect :: Bool
+data PS = PS
+  { connect :: !Bool
+  , curFont :: !Font
   }
+
+initialPS :: PS
+initialPS = PS { connect = False, curFont = Roman }
 
 type PE = ParseError Char ()
 
@@ -34,8 +40,11 @@ nonspaceP = takeWhile1P' (not . isSpace)
 
 data CharParseResult
   = Consume    { _consumeCount :: !Int, _parseResult :: !Text }
-  | SwitchFont { _consumeCount :: !Int, _fontName :: !Text }
-  | Connect     -- Consume count = 2
+  | SwitchFont { _consumeCount :: !Int, _fontName :: !Font }
+  | Connect
+
+data Font = Bold | Italic | Roman
+  deriving Eq
 
 -- | Parser for man page characters handling escape codes.
 --
@@ -83,14 +92,18 @@ charLiteral = label "man page char literal" $ do
         -- O&K also suggests other forms of \f with font numbers but we ignore
         -- those for now.
         [] -> unexpected (Tokens ('\\':|['f'])) <?> font_msg
-        z':_  -> pure (SwitchFont 3 (T.singleton z'))
+        'B':_ -> pure (SwitchFont 3 Bold)
+        'I':_ -> pure (SwitchFont 3 Italic)
+        'P':_ -> pure (SwitchFont 3 Roman) -- TODO: where is this specified
+        'R':_ -> pure (SwitchFont 3 Roman)
+        _ -> unexpected (Tokens ('\\':|('f':z))) <?> unknown_font_msg
     c -> one 1 c
   where
     one cnt c = pure (Consume cnt (T.singleton c))
-    -- done = pure ConsumeRest
     eoi_msg = "Unexpected end of input in the middle of an escape code."
     unimpl_msg = "Don't know how to handle this case yet."
     font_msg = "A font needs to be specified here."
+    unknown_font_msg = "Got an unknown font :(, expected B, I, R or P."
 
 consumeRestP :: MonadChars e s m => m a
 consumeRestP =
@@ -106,28 +119,38 @@ space1NoNL = void (takeWhile1P (Just "space no newline")
 lexeme :: MonadParsec e Text m => m a -> m a
 lexeme = L.lexeme (L.space space1NoNL (L.skipLineComment "\\\"") empty)
 
-directiveArgCharP :: MonadChars e s m => (Char -> Bool) -> String -> m Text
+type AnnText = Pair Font Text
+
+forgetFont :: Foldable t => t AnnText -> Text
+forgetFont = foldMap pairSnd
+
+directiveArgCharP :: MonadRoff e s m => (Char -> Bool) -> String -> m AnnText
 directiveArgCharP isBad msg = charLiteral >>= \case
   Consume 1 c | isBad (T.head c) -> unexpected (Tokens (T.head c :| [])) <?> msg
-  Consume i t -> skipCount i C.anyChar *> pure t
-  SwitchFont i t -> skipCount i C.anyChar *> switchFont t *> directiveArgCharP isBad msg
+  Consume i t -> skipCount i C.anyChar *> annText t
+  SwitchFont i f -> skipCount i C.anyChar *> switchFont f *> directiveArgCharP isBad msg
   Connect -> skipCount 2 C.anyChar *> turnConnectOn *> directiveArgCharP isBad msg
   where
-    turnConnectOn = pure ()
-    switchFont _ = pure ()
+    annText = (Pair <$> gets curFont <*>) . pure
+    turnConnectOn = modify (\ps -> ps{connect = True})
+    switchFont f = modify (\ps -> ps{curFont = f})
 
-directiveArgChar1P :: MonadChars e s m => m Text
+directiveArgChar1P :: MonadRoff e s m => m AnnText
 directiveArgChar1P = directiveArgCharP (== '"') "Got double quote"
 
-directiveArgChar2P :: MonadChars e s m => m Text
+directiveArgChar2P :: MonadRoff e s m => m AnnText
 directiveArgChar2P = directiveArgCharP isSpace "Got space char"
 
-directiveArgP :: MonadParsec e Text m => m Text
+-- Since directive arguments are typically expected to use the same font
+-- throughout, the lists will be small.
+directiveArgP :: MonadRoff e s m => m [AnnText]
 directiveArgP =
-  between (C.char '"') (C.char '"') (T.concat <$> many directiveArgChar1P)
-  <|> (T.concat <$> some directiveArgChar2P)
+  between (C.char '"') (C.char '"') (coalesce <$> many directiveArgChar1P)
+  <|> (coalesce <$> some directiveArgChar2P)
 
-lineP :: MonadParsec e Text m => m (Text, [Text])
+type Words a = [a]
+
+lineP :: MonadRoff e Text m => m (Text, Words [AnnText])
 lineP = do
   c <- C.anyChar
   case c of
