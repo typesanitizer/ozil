@@ -16,7 +16,6 @@ import Help.Ozil.Death (unreachableError)
 import Brick (textWidth)
 import Control.Monad.State.Strict
 import Data.Char (isSpace, isAlphaNum, isUpper)
-import Data.List.Split (chop)
 import Lens.Micro ((%~))
 import Lens.Micro.TH (makeLenses)
 import Lens.Micro.Type (Lens', SimpleGetter)
@@ -141,8 +140,7 @@ parseHelpPage txt =
     isPlain _ = False
     isTabular tt (Tabular tt' _ _) = tt == tt'
     isTabular _ _ = False
-    groupConcat [] = (undefined, []) -- This case won't be called...
-    groupConcat (itm : itms) = case itm of
+    groupConcat (itm :| itms) = case itm of
       Plain t -> let (plains, rest) = span isPlain itms in
         (Plain (T.concat (t : map (\(Plain t') -> t') plains)), rest)
       Tabular tt tes _ -> let (tes', rest) = span (isTabular tt) itms in

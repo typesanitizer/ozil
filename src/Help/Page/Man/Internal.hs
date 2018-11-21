@@ -29,7 +29,6 @@ import Text.Megaparsec.Char as C
 
 import Data.Char (isSpace, isAlphaNum)
 import Data.HashSet (HashSet)
-import Data.List.Split (chop)
 import Lens.Micro ((%~))
 
 import qualified Data.Text as T
@@ -172,7 +171,7 @@ parseManPage t =
 
     mkSections :: [Chunk] -> Vector (Text, Chunks)
     mkSections = V.fromList . catMaybes . chop
-        (\(ch:chs) -> case ch of
+        (\(ch:|chs) -> case ch of
             Chunk (Dir "SH") sh ->
               let (chks, rest) = break isSectionHeading chs
               in (Just (dropQuotes sh, coalesceChunks chks), rest)
@@ -206,8 +205,7 @@ chunkToFM (Chunk d z) =
 coalesceChunks :: [Chunk] -> Vector Chunk
 coalesceChunks = V.fromList . chop groupConcat
   where
-    groupConcat [] = error "unreachable in chop"
-    groupConcat (Chunk d txt : chks) =
+    groupConcat (Chunk d txt :| chks) =
         let (txts, rest) = flip mapSpan chks $ \(Chunk d' z) ->
               if d' == d then Just z
               else Nothing

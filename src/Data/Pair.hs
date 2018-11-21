@@ -4,7 +4,7 @@ import Data.Bifunctor (Bifunctor (..))
 import Data.Foldable (toList)
 import Data.Function ((&))
 import Data.Hashable (Hashable)
-import Data.List.Split (chop)
+import Data.List.NonEmpty (NonEmpty (..))
 import GHC.Generics (Generic)
 
 data Pair a b = Pair !a !b
@@ -32,7 +32,14 @@ coalesce = coalesceWith mconcat
 
 coalesceWith :: (Foldable t, Eq a) => ([b] -> b) -> t (Pair a b) -> [Pair a b]
 coalesceWith concat_f x = toList x
-  & chop (\(Pair ay by : ys) ->
+  & chop (\(Pair ay by :| ys) ->
             let (pre, post) = span (\p -> pairFst p == ay) ys
             in (Pair ay (concat_f (by : map pairSnd pre)), post)
          )
+
+-- Uhh, this is needed here as this module is import by Commons, so we can't
+-- define chop in Commons and import it here.
+chop :: (NonEmpty a -> (b, [a])) -> [a] -> [b]
+chop _ [] = []
+chop f (x:xs) = b : chop f as'
+  where (b, as') = f (x :| xs)
