@@ -32,6 +32,8 @@ toc::[]
   ** [ ] Man pages
 * [*] Configurable keybindings with hot-reloading.
 
+image:https://i.imgur.com/vz4pPug.gif[Ozil - demo with subcommand detection and links, width=640]
+
 ### Planned
 * Basic options to customize appearance (with hot-reloading).
 * Proper man page support (fill remain check-boxes in Feature list).
