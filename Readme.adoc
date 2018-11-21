@@ -1,4 +1,4 @@
-= ozil - A man with intelligence and vision image:https://travis-ci.com/theindigamer/ozil.svg?token=atg5zCeDiWzbYpJit3Kx&branch=master["Build Status", link="https://travis-ci.com/theindigamer/ozil"]
+= ozil - A man with intelligence and vision image:https://travis-ci.com/theindigamer/ozil.svg?branch=master["Build Status", link="https://travis-ci.com/theindigamer/ozil"]
 :idprefix:
 :idseparator: -
 :sectanchors:
