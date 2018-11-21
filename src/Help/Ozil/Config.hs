@@ -6,6 +6,8 @@ module Help.Ozil.Config
   , saveConfig
   , module Help.Ozil.Config.Watch
   , Conf.Config
+  , getConfigSimple
+  , ParseException
   )
   where
 
@@ -21,7 +23,7 @@ import Help.Ozil.Startup.Core (options, modifyConfig, Startup)
 
 import System.Directory
 
-import Data.Yaml (prettyPrintParseException, decodeFileEither, encode)
+import Data.Yaml (ParseException, prettyPrintParseException, decodeFileEither, encode)
 import System.Exit (exitSuccess)
 import System.FilePath (takeDirectory)
 
@@ -44,6 +46,20 @@ getConfig =
     >>= readWriteConfig
     >>  checkDbExists
     >>= syncDbIfApplicable
+
+{-# ANN getConfigSimple ("HLint: ignore Avoid lambda" :: String) #-}
+-- | Returns a function that uses everything from the newly read config,
+-- except for one thing -- the new config might only have incomplete
+-- keybindings, so you provide a backup config as an argument to provide
+-- bindings missing from the newly read config.
+getConfigSimple
+  :: FilePath
+  -> IO (Either ParseException (Conf.Config -> Conf.Config))
+getConfigSimple p = decodeFileEither p
+  <&> fmap (\cfg -> over Conf.userConfig (mergeConfig cfg))
+  where
+    mergeConfig inp sofar = let kbs = keyBindings in
+      over kbs (H.unionWith (flip const) (sofar ^. kbs)) inp
 
 foundConfigFile :: Startup OzilFileExists
 foundConfigFile = do
@@ -130,13 +146,12 @@ readWriteConfig = \case
  where
   -- TODO: Implement this.
   syncConfig = pure ()
-  mergeConfig inp sofar = let kbs = keyBindings in
-    over kbs (H.unionWith (flip const) (sofar ^. kbs)) inp
   readConfig = do
     effcp <- effectiveConfigPath
-    liftIO (decodeFileEither effcp) >>= \case
-      Right cfg -> modifyConfig (over Conf.userConfig (mergeConfig cfg))
-      Left err  ->
+    mod_f <- liftIO $ getConfigSimple effcp
+    case mod_f of
+      Right f -> modifyConfig f
+      Left err ->
         liftIO . warn . configDecodeWarning $ prettyPrintParseException err
   configDecodeWarning s = T.pack $
     printf "Couldn't parse the config file %s.\n%s" Default.configPath s

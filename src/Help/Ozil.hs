@@ -6,7 +6,7 @@ import Help.Ozil.Cmd
 import Help.Ozil.Core
 
 import Help.Page.Lenses (indents, anchors, tableIxs, helpPage)
-import Help.Ozil.Config (FSEvent, toReactOrNotToReact)
+import Help.Ozil.Config (getConfigSimple, FSEvent, toReactOrNotToReact)
 import Help.Ozil.Config.Types (KeyBindings)
 import Help.Ozil.KeyBinding (matchesKeyPress, Action (..), displayKeyBinding)
 import Help.Ozil.Startup (finishStartup)
@@ -15,6 +15,7 @@ import qualified Help.Page as Page
 import qualified Help.Ozil.Config.Default as Default
 
 import Brick (App (..))
+import Data.Either (fromRight)
 import Data.Foldable (any, toList)
 import Data.List (transpose)
 import System.Directory (doesDirectoryExist)
@@ -80,6 +81,7 @@ handleEvent
   -> Brick.BrickEvent n OEvent
   -> Brick.EventM OResource (Brick.Next OState)
 handleEvent s = \case
+  Brick.AppEvent (OEvent fsev) -> handleFSEvent s fsev
   KeyPress Vty.KEsc        -> stopProgram
   KeyPress (Vty.KChar 'q') -> stopProgram
   ev -> do
@@ -119,6 +121,20 @@ handleEvent s = \case
           & view Brick.vpSize
           & Vty.regionHeight
           & \h -> pure (h `div` 2)
+
+-- | Try to reload the config file, using the default keybindings as a backup.
+handleFSEvent :: OState -> FSEvent -> Brick.EventM OResource (Brick.Next OState)
+handleFSEvent os = \case
+  FSNotify.Removed{} -> Brick.continue os
+  FSNotify.Unknown{} -> Brick.continue os
+  FSNotify.Modified p _ _ -> tryReadFile p
+  FSNotify.Added p _ _ -> tryReadFile p
+  where
+    tryReadFile p =
+      if p == Default.configPath then do
+        mod_f <- liftIO (getConfigSimple p)
+        Brick.continue (set config (fromRight id mod_f Default.config) os)
+      else Brick.continue os
 
 
 -- The UI should look like
