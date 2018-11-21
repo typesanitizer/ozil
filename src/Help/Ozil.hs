@@ -7,14 +7,16 @@ import Help.Ozil.Core
 
 import Help.Page.Lenses (indents, anchors, tableIxs, helpPage)
 import Help.Ozil.Config (FSEvent, toReactOrNotToReact)
-import Help.Ozil.KeyBinding (matchesKeyPress, Action (..))
+import Help.Ozil.Config.Types (KeyBindings)
+import Help.Ozil.KeyBinding (matchesKeyPress, Action (..), displayKeyBinding)
 import Help.Ozil.Startup (finishStartup)
 
 import qualified Help.Page as Page
 import qualified Help.Ozil.Config.Default as Default
 
 import Brick (App (..))
-import Data.Foldable (any)
+import Data.Foldable (any, toList)
+import Data.List (transpose)
 import System.Directory (doesDirectoryExist)
 
 import qualified Brick
@@ -138,34 +140,55 @@ viewerUI
   :: ( HasDoc s Page.DocPage
      , HasHeading s Text
      , HasLinkState s Page.LinkState
-     , HasDebugMode s Bool)
+     , HasDebugMode s Bool
+     , HasKeyBindings s KeyBindings)
   => s
   -> [Brick.Widget OResource]
 viewerUI s =
-  (\x -> if s ^. debugMode then [Brick.vBox [debugWidget, x]] else [x])
+  (\x -> if s ^. debugMode
+         then [Brick.vBox [debugWidget (s ^. doc), x]]
+         else [x]
+  )
   $ Border.borderWithLabel (Brick.txt header)
     $ mainstuff
       ===
       Border.hBorder
       ===
-      Brick.txtWrap keyBindingTxt
+      keybindingHUD (s ^. linkState) (s ^. keyBindings)
   where
-    debugWidget =
-      Brick.strWrap (s ^. doc & Page.displayDocPageSummary)
-      ===
-      Brick.strWrap (("Anchors: " <>) . show $ s ^? doc . helpPage . anchors)
-      ===
-      Brick.strWrap (("TableIxs: " <>) . show $ s ^? doc . helpPage . tableIxs)
-      ===
-      Brick.strWrap (("Indents: " <>) . show $ s ^? doc . helpPage . indents)
-    keyBindingTxt = keyBindings1 <> "\n" <> keyBindings2
-    keyBindings1 = "Esc/q = Exit  k/↑ = Up  C-u = Up!  j/↓ = Down  C-d = Down!"
-    keyBindings2 =
-      if s ^. linkState & Page.isOn then
-        "f = Turn off hints   n = Next hint   p = Previous hint\n\
-        \                 C-n/↵ = Follow  C-p/← = Go back"
-      else
-        "f = Turn on hints"
     header = T.snoc (T.cons ' ' (s ^. heading)) ' '
     mainstuff = Page.render (s ^. linkState) (s ^. doc)
       & Brick.viewport TextViewport Brick.Vertical
+
+keybindingHUD :: Page.LinkState -> KeyBindings -> Brick.Widget n
+keybindingHUD ls kbs = Brick.hBox (map Brick.vBox (transpose (row1 : rest)))
+  where
+    kbTxt a = T.intercalate "/" . map displayKeyBinding $ toList (kbs H.! a)
+    row a b c =
+      [Brick.txt a, Brick.padLeftRight 2 (Brick.txt b), Brick.txt c]
+    row1 = row
+      (kbTxt ExitProgram <> " = Exit")
+      (kbTxt ScrollUp <> "/" <> kbTxt ScrollUpHalfPage <> " = Up")
+      (kbTxt ScrollDown <> "/" <> kbTxt ScrollDownHalfPage <> " = Down")
+    toggle = kbTxt ToggleLinks <> " = Toggle links"
+    rest =
+      if ls & Page.isOn then
+        [ row toggle
+           (kbTxt LinkJumpNext <> " = Next link")
+           (kbTxt LinkJumpPrevious <> " = Previous link")
+        , row ""
+           (kbTxt LinkFollow <> " = Follow")
+           (kbTxt LinkGoBack <> " = Go back")
+        ]
+      else
+        [row toggle "" ""]
+
+debugWidget :: Page.DocPage -> Brick.Widget n
+debugWidget d =
+  Brick.strWrap (d & Page.displayDocPageSummary)
+  ===
+  Brick.strWrap (("Anchors: " <>) . show $ d ^? helpPage . anchors)
+  ===
+  Brick.strWrap (("TableIxs: " <>) . show $ d ^? helpPage . tableIxs)
+  ===
+  Brick.strWrap (("Indents: " <>) . show $ d ^? helpPage . indents)

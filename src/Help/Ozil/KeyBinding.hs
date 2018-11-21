@@ -6,6 +6,7 @@ module Help.Ozil.KeyBinding
   , mkBinding
   , matchesKeyPress
   , parseKeyBinding
+  , displayKeyBinding
   , ParseError (..)
   )
   where
@@ -88,6 +89,43 @@ matchesKeyPress k mods (KeyBinding k' mods') =
 mkBinding :: Key -> [Modifier] -> KeyBinding
 mkBinding k mods = KeyBinding k (sort (nub mods))
 
+displayKeyBinding :: KeyBinding -> T.Text
+displayKeyBinding (KeyBinding k mods) =
+  T.intercalate "-" (map displayModifier mods ++ [displayKey k])
+  where
+    displayModifier = \case
+      MMeta -> "Meta"
+      MAlt -> "Alt"
+      MCtrl -> "Ctrl"
+      MShift -> "Shift"
+    displayKey = \case
+      KEsc -> "Esc"
+      KChar '\t' -> "Tab"
+      KChar c -> T.singleton c
+      KBS -> "BS"
+      KEnter -> "Enter"
+      KLeft -> "← "
+      KRight -> "→ "
+      KUp -> "↑"
+      KDown -> "↓"
+      KUpLeft -> "←+↑"
+      KUpRight -> "↑+→"
+      KDownLeft -> "←+↓"
+      KDownRight -> "↓+→"
+      KHome -> "Home"
+      KPageDown -> "PgDown"
+      KPageUp -> "PgUp"
+      KBackTab -> "Shift-Tab"
+      KBegin -> "Begin"
+      KMenu -> "Menu"
+      KDel -> "Del"
+      KIns -> "Ins"
+      KCenter -> "Center"
+      KFun i -> "F" <> T.pack (show i)
+      KPrtScr -> "PrtSc"
+      KPause -> "Pause"
+      KEnd -> "End"
+
 instance Show KeyBinding where
   show (KeyBinding k mods) = intercalate "-" (map display mods ++ [showKey k])
     where
@@ -98,6 +136,7 @@ instance Show KeyBinding where
         MShift -> "shift"
       showKey = \case
         KEsc -> "esc"
+        KChar '\t' -> "tab"
         KChar c -> [c]
         KBS -> "back"
         KEnter -> "enter"
@@ -110,7 +149,7 @@ instance Show KeyBinding where
         KDownLeft -> "downleft"
         KDownRight -> "downright"
         KCenter -> "center"
-        KFun i -> "fn" <> show i
+        KFun i -> "f" <> show i
         KBackTab -> "backtab"
         KPrtScr -> "prtsc"
         KPause -> "pause"
@@ -173,7 +212,8 @@ keyP =
   <|> "pagedown" --> KPageDown
   <|> "begin" --> KBegin
   <|> "menu" --> KMenu
-  <|> KFun <$> (C.string "fn" *> L.decimal)
+  <|> try (KFun <$> (C.string "f" *> L.decimal))
+  <|> "tab" --> KChar '\t'
   <|> KChar <$> C.anyChar
 
 keyBindingP
