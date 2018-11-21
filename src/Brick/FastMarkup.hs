@@ -2,7 +2,6 @@
 {-# LANGUAGE DataKinds           #-}
 {-# LANGUAGE KindSignatures      #-}
 {-# LANGUAGE ViewPatterns        #-}
-{-# LANGUAGE MultiWayIf          #-}
 {-# LANGUAGE DeriveAnyClass      #-}
 
 module Brick.FastMarkup where

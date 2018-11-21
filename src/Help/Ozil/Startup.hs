@@ -133,8 +133,8 @@ runSelectionApp dps = do
   i <- Brick.defaultMain (selectionApp len dps) 0
   let dp = assert (0 <= i && i < len) (dps NE.!! i)
   -- TODO: We should use this app and then save the configuration.
-  -- ss <- Brick.defaultMain (saveSelectionApp dp) DontSave
-  pure (dp, DontSave)
+  ss <- Brick.defaultMain (saveSelectionApp dp) DontSave
+  pure (dp, ss)
 
 highlightSelection :: Brick.AttrMap
 highlightSelection = Brick.attrMap Vty.defAttr

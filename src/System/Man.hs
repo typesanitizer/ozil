@@ -1,5 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-
 module System.Man where
 
 import Commons

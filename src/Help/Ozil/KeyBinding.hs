@@ -4,6 +4,7 @@ module Help.Ozil.KeyBinding
   ( Action (..)
   , KeyBinding
   , mkBinding
+  , matchesKeyPress
   , parseKeyBinding
   , ParseError (..)
   )
@@ -14,7 +15,7 @@ import Text.Megaparsec
 
 import Data.Aeson.Types (typeMismatch)
 import Data.Hashable (Hashable)
-import Data.List (nub, intercalate)
+import Data.List (sort, nub, intercalate)
 import Data.String (IsString)
 import GHC.Generics (Generic)
 import Graphics.Vty.Input (Key (..), Modifier (..))
@@ -35,6 +36,7 @@ data Action
   | LinkGoBack
   | LinkJumpNext
   | LinkJumpPrevious
+  | ToggleLinks
   | ExitProgram
   deriving (Eq, Generic, Hashable)
 
@@ -48,6 +50,7 @@ instance Show Action where
     LinkGoBack -> "link-go-back"
     LinkJumpNext -> "link-jump-next"
     LinkJumpPrevious -> "link-jump-previous"
+    ToggleLinks -> "toggle-links"
     ExitProgram -> "exit-program"
 
 instance ToJSON Action where
@@ -65,6 +68,7 @@ instance FromJSON Action where
     "link-go-back" -> pure LinkGoBack
     "link-jump-next" -> pure LinkJumpNext
     "link-jump-previous" -> pure LinkJumpPrevious
+    "toggle-links" -> pure ToggleLinks
     "exit-program" -> pure ExitProgram
     _ -> fail "Unexpected action name."
   parseJSON invalid = typeMismatch "Action" invalid
@@ -77,8 +81,12 @@ instance FromJSONKey Action where
 -- Invariants: The list has unique elements.
 data KeyBinding = KeyBinding !Key [Modifier]
 
+matchesKeyPress :: Key -> [Modifier] -> KeyBinding -> Bool
+matchesKeyPress k mods (KeyBinding k' mods') =
+  k == k' && sort mods == sort mods'
+
 mkBinding :: Key -> [Modifier] -> KeyBinding
-mkBinding k mods = KeyBinding k (nub mods)
+mkBinding k mods = KeyBinding k (sort (nub mods))
 
 instance Show KeyBinding where
   show (KeyBinding k mods) = intercalate "-" (map display mods ++ [showKey k])

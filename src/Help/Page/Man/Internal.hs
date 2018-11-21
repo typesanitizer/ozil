@@ -1,6 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE TypeFamilies #-}
-
 module Help.Page.Man.Internal
   ( WhatisDescription (..)
   , parseWhatisDescription

@@ -10,6 +10,7 @@ module Help.Ozil.Core
   , OResource (..)
   , OState
   , HasDoc (..)
+  , HasKeyBindings (..)
   , pushDoc
   , popDoc
   , HasHeading (..)

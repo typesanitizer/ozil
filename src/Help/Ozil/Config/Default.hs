@@ -71,5 +71,6 @@ defaultKeyBindings = H.fromList
   , (LinkGoBack,         [(KChar 'p', [MCtrl]), (KBS,    [])])
   , (LinkJumpNext,       [(KChar 'n', [])])
   , (LinkJumpPrevious,   [(KChar 'p', [])])
+  , (ToggleLinks,        [(KChar 'f', [])])
   , (ExitProgram,        [(KEsc, []), (KChar 'q', [])])
   ]

@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeFamilies #-}
-
 module Commons
   ( module Control.DeepSeq
   , module Control.Exception

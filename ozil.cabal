@@ -34,9 +34,10 @@ library
                       TypeFamilies
                       BangPatterns
                       LambdaCase
-                      NamedFieldPuns
-                      OverloadedStrings
+                      MultiWayIf
                       TupleSections
+                      OverloadedStrings
+                      NamedFieldPuns
                       PatternSynonyms
   ghc-options: -Wall
                -Wcompat

@@ -1,5 +1,5 @@
-{-# LANGUAGE RankNTypes      #-}
-{-# OPTIONS_GHC -Wno-unused-top-binds -Wno-redundant-constraints #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 module Help.Ozil.Config
   ( getConfig
@@ -15,6 +15,7 @@ import Help.Ozil.Config.Watch
 import Help.Ozil.Death
 
 import Help.Ozil.Cmd (configPath, optCommand, Command (..), ConfigOptions (..))
+import Help.Ozil.Config.Types (HasKeyBindings (..))
 import Help.Ozil.Console.Text (warn, prompt, pattern DefaultYes)
 import Help.Ozil.Startup.Core (options, modifyConfig, Startup)
 
@@ -24,8 +25,9 @@ import Data.Yaml (prettyPrintParseException, decodeFileEither, encode)
 import System.Exit (exitSuccess)
 import System.FilePath (takeDirectory)
 
-import qualified Data.Text as T
 import qualified Data.ByteString as BS
+import qualified Data.HashMap.Strict as H
+import qualified Data.Text as T
 import qualified Help.Ozil.Config.Types as Conf
 import qualified Help.Ozil.Config.Default as Default
 
@@ -35,13 +37,13 @@ import qualified Help.Ozil.Config.Default as Default
 -- implementations of previous functions, which is not reflected in the types.
 
 getConfig :: HasCallStack => Startup ()
-getConfig = pure () -- do
-  -- foundConfigFile
-  --   >>= deleteConfigFileIfApplicable
-  --   >>= createConfigFileIfApplicable
-  --   >>= readWriteConfig
-  --   >>  checkDbExists
-  --   >>= syncDbIfApplicable
+getConfig =
+  foundConfigFile
+    >>= deleteConfigFileIfApplicable
+    >>= createConfigFileIfApplicable
+    >>= readWriteConfig
+    >>  checkDbExists
+    >>= syncDbIfApplicable
 
 foundConfigFile :: Startup OzilFileExists
 foundConfigFile = do
@@ -123,15 +125,17 @@ readWriteConfig = \case
     Config ConfigReInit -> readConfig *> syncConfig *> liftIO exitSuccess
     Config ConfigDelete -> pure ()
     Config ConfigInit   -> pure ()
-    Default{}           -> pure ()
+    Default{}           -> readConfig
     WhatIs{}            -> pure ()
  where
   -- TODO: Implement this.
   syncConfig = pure ()
+  mergeConfig inp sofar = let kbs = keyBindings in
+    over kbs (H.unionWith (flip const) (sofar ^. kbs)) inp
   readConfig = do
     effcp <- effectiveConfigPath
     liftIO (decodeFileEither effcp) >>= \case
-      Right cfg -> modifyConfig (set Conf.userConfig cfg)
+      Right cfg -> modifyConfig (over Conf.userConfig (mergeConfig cfg))
       Left err  ->
         liftIO . warn . configDecodeWarning $ prettyPrintParseException err
   configDecodeWarning s = T.pack $

@@ -5,19 +5,22 @@ import Commons
 import Help.Ozil.Cmd
 import Help.Ozil.Core
 
-import Help.Ozil.Config (FSEvent, toReactOrNotToReact)
-import Help.Ozil.Startup (finishStartup)
 import Help.Page.Lenses (indents, anchors, tableIxs, helpPage)
+import Help.Ozil.Config (FSEvent, toReactOrNotToReact)
+import Help.Ozil.KeyBinding (matchesKeyPress, Action (..))
+import Help.Ozil.Startup (finishStartup)
 
 import qualified Help.Page as Page
 import qualified Help.Ozil.Config.Default as Default
 
 import Brick (App (..))
+import Data.Foldable (any)
 import System.Directory (doesDirectoryExist)
 
 import qualified Brick
 import qualified Brick.BChan as BChan
 import qualified Brick.Widgets.Border as Border
+import qualified Data.HashMap.Strict as H
 import qualified Data.Text as T
 import qualified Graphics.Vty as Vty
 import qualified System.FSNotify as FSNotify
@@ -78,44 +81,42 @@ handleEvent s = \case
   KeyPress Vty.KEsc        -> stopProgram
   KeyPress (Vty.KChar 'q') -> stopProgram
   ev -> do
-    scrollAmt <- case ev of
-        KeyPress Vty.KDown       -> pure 1
-        KeyPress (Vty.KChar 'j') -> pure 1
-        KeyPress (Vty.KChar 'k') -> pure (-1)
-        KeyPress Vty.KUp         -> pure (-1)
-        KeyPress' (Vty.KChar c) [Vty.MCtrl]
-          | c == 'd' || c == 'u' -> halfHeight c
-        _ -> pure 0
+    scrollAmt <- if
+      | ev `isKeyFor` ScrollUp -> pure (-1)
+      | ev `isKeyFor` ScrollDown -> pure 1
+      | ev `isKeyFor` ScrollUpHalfPage -> ((-1) *) <$> halfHeight
+      | ev `isKeyFor` ScrollDownHalfPage -> halfHeight
+      | otherwise -> pure 0
     when (scrollAmt /= 0)
       $ Brick.vScrollBy (Brick.viewportScroll TextViewport) scrollAmt
-    let changeLinkState = case ev of
-          KeyPress (Vty.KChar 'f') -> Page.flipLinkState
-          KeyPress (Vty.KChar 'n') -> Page.mapLinkState (+1)
-          KeyPress (Vty.KChar 'p') -> Page.mapLinkState (subtract 1)
-          _ -> id
-    let changeDocState = case ev of
-          KeyPress' (Vty.KChar 'n') [Vty.MCtrl] -> pushDoc
-          KeyPress  Vty.KEnter                  -> pushDoc
-
-          KeyPress' (Vty.KChar 'p') [Vty.MCtrl] -> pure . popDoc
-          KeyPress  Vty.KBS                     -> pure . popDoc
-          _ -> pure
+    let changeLinkState = if
+          | ev `isKeyFor` ToggleLinks -> Page.flipLinkState
+          | ev `isKeyFor` LinkJumpNext -> Page.mapLinkState (+1)
+          | ev `isKeyFor` LinkJumpPrevious -> Page.mapLinkState (subtract 1)
+          | otherwise -> id
+    let changeDocState = if
+          | ev `isKeyFor` LinkFollow -> pushDoc
+          | ev `isKeyFor` LinkGoBack -> pure . popDoc
+          | otherwise -> pure
     s' <- liftIO (changeDocState (over linkState changeLinkState s))
     Brick.continue s'
   where
+    isKeyFor (Brick.VtyEvent (Vty.EvKey k mods)) action =
+      any (matchesKeyPress k mods) ((s ^. keyBindings) H.! action)
+    isKeyFor _ _ = False
     stopProgram = do
       case s ^. watch of
         Running stopWatch -> liftIO stopWatch
         Uninitialized _ -> pure ()
         NoWatch -> pure ()
       Brick.halt s
-    halfHeight :: Char -> Brick.EventM OResource Int
-    halfHeight c = do
+    halfHeight :: Brick.EventM OResource Int
+    halfHeight = do
       mvp <- Brick.lookupViewport TextViewport
       mvp & fromMaybe (error "Viewport missing. Wat.")
           & view Brick.vpSize
           & Vty.regionHeight
-          & \h -> pure $ (if c == 'd' then 1 else -1) * (h `div` 2)
+          & \h -> pure (h `div` 2)
 
 
 -- The UI should look like
@@ -147,7 +148,7 @@ viewerUI s =
       ===
       Border.hBorder
       ===
-      Brick.txtWrap keyBindings
+      Brick.txtWrap keyBindingTxt
   where
     debugWidget =
       Brick.strWrap (s ^. doc & Page.displayDocPageSummary)
@@ -157,7 +158,7 @@ viewerUI s =
       Brick.strWrap (("TableIxs: " <>) . show $ s ^? doc . helpPage . tableIxs)
       ===
       Brick.strWrap (("Indents: " <>) . show $ s ^? doc . helpPage . indents)
-    keyBindings = keyBindings1 <> "\n" <> keyBindings2
+    keyBindingTxt = keyBindings1 <> "\n" <> keyBindings2
     keyBindings1 = "Esc/q = Exit  k/↑ = Up  C-u = Up!  j/↓ = Down  C-d = Down!"
     keyBindings2 =
       if s ^. linkState & Page.isOn then
