@@ -70,7 +70,7 @@ instance FromJSON UserConfigV1_0 where
 
 instance ToJSON UserConfigV1_0 where
   toJSON UserConfigV1_0{_savedPreferences, _keyBindings} = object
-    ["saved-selection" .= _savedPreferences, "key-bindings" .= _keyBindings]
+    ["saved-preferences" .= _savedPreferences, "key-bindings" .= _keyBindings]
 
 data SystemInfoV1_0 = SystemInfoV1_0
   { _ozilConfigFileExists :: !(Maybe FilePath)

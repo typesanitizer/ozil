@@ -16,18 +16,26 @@ toc::[]
 
 ## Features
 
-* [X] A top, top qualitee name.
+* [*] A top, top qualitee name.
 * [ ] Transparently works with man pages and help pages (typically accessed with
   `--help` or `-h`).
   ** [TODO: Insert GIF]
+  ** [*] Help pages
+  ** [ ] Man pages
 * [ ] Follow links inside man/help pages with hints.
   ** TODO: insert GIF
+  ** [*] Help pages
+  ** [ ] Man page
 * [ ] Automatic detection of subcommand help pages.
   ** TODO: insert GIF
+  ** [*] Help pages
+  ** [ ] Man pages
+* [*] Configurable keybindings with hot-reloading.
 
 ### Planned
-* [ ] Simple but flexible configuration with hot-reloading by default [WIP].
-* [ ] Search text.
+* Basic options to customize appearance (with hot-reloading).
+* Proper man page support (fill remain check-boxes in Feature list).
+* Search text (see link:https://github.com/theindigamer/ozil/issues/10[issue 10]).
 
 ## Platforms
 
@@ -68,17 +76,26 @@ That's mostly it. `ozil` will guide you as needed. Of course, you can try using
 
 ### Configuration
 
-TODO: Fill out this section.
+Currently, `ozil` will place a configuration file at
+`$HOME/.config/ozil/ozil.yaml` (it will prompt you every time you run it
+if that file doesn't exist). You can save your preferred keybindings there.
+The default keybindings are already present, so you can tweak those to your
+liking. (Note: due to the quirkiness of YAML, `n` needs to be quoted.)
+
+If that path doesn't work for your distro (or on Mac OS) - please open an issue
+and I'll try to figure something out.
+
+TODO: Document keybinding configuration more thoroughly.
 
 ## Contributing
 
-See [Contributing.md]().
+See link:https://github.com/theindigamer/ozil/blob/master/Contributing.md[Contributing.md].
 
 ## Thanks
 
 Special thanks to the Brick maintainer @jtdaugherty for making such as easy to
 use and well-documented TUI library. Writing `ozil` wouldn't have been possible
-without it :smile:.
+without it :smile:. Also, thanks to Mark Karpov for Megaparsec.
 
 ## Miscellaneous
 
