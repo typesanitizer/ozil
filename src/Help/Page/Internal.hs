@@ -1,13 +1,13 @@
-{-# LANGUAGE DeriveAnyClass #-}
-
 module Help.Page.Internal where
 
 import Commons (Generic, Text)
 
-import Data.Aeson (FromJSON, ToJSON)
 import Help.Page.Help (HelpPage)
 import Help.Page.Man (ManPage (..), WhatisDescription (..))
 import Help.Subcommand (Subcommand)
+
+import Data.Aeson
+import Data.Aeson.Types (Parser, typeMismatch)
 
 data DocPage
   = Man  { _docPageManSummary  :: ManPageSummary, _docPageManPage  :: ManPage }
@@ -32,10 +32,24 @@ data HelpPageSummary = HelpPageSummary
 data BinaryPath
   = Simple FilePath
   | Local BuildSystem BinName
-  deriving (Eq, Show, Generic, FromJSON, ToJSON)
+  deriving (Eq, Show, Generic)
 
-data BuildSystem = Stack | Cabal | Cargo
-  deriving (Eq, Show, Generic, FromJSON, ToJSON)
+data BuildSystem = Cabal | Cargo | Stack
+  deriving (Eq, Show, Generic)
+
+instance ToJSON BuildSystem where
+  toJSON = \case
+    Stack -> String "stack"
+    Cabal -> String "cabal"
+    Cargo -> String "cargo"
+
+instance FromJSON BuildSystem where
+  parseJSON (String s) = case s of
+    "cabal" -> pure Cabal
+    "cargo" -> pure Cargo
+    "stack" -> pure Stack
+    _ -> fail "Unrecognized build system."
+  parseJSON invalid = typeMismatch "Build system" invalid
 
 type BinName = String
 
