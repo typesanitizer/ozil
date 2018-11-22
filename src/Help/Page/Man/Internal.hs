@@ -186,12 +186,12 @@ parseManPage t =
 
 chunkToFM :: V.Vector v (Text, AttrName) => Chunk -> v (Text, AttrName)
 chunkToFM (Chunk d z) =
-  let z' = rewrite z
+  let z' = T.replace "\\-" "-" z
       alt t a1 a2 = V.fromList
         [ (x, a) | (i, x) <- zip [0 ..] (T.splitOn "\\|" t)
                  , let a = if i `mod` 2 == 0 then a1 else a2
         ]
-      res  = if
+      res = if
         | d == Dir "B"  -> solo z' "man-B"
         | d == Dir "I"  -> solo z' "man-I"
         | d == Dir "RB" -> alt  z' "man-default" "man-B"
@@ -204,7 +204,6 @@ chunkToFM (Chunk d z) =
   in res
   where
     solo = curry V.singleton
-    rewrite = T.replace "\\-" "-"
 
 coalesceChunks :: [Chunk] -> Vector Chunk
 coalesceChunks = V.fromList . chop groupConcat
@@ -248,11 +247,6 @@ knownDirectives = Set.fromList
 
 newtype PS = PS {unrecognized :: [Int]}
 
--- | Summary of rules gleamed from man.1 so far -
--- * @.B|.I@ - text is B/I but spaces are not underlined
--- * @.RB|.RI@ - text alternates between R and B/I separated by spaces
---               which are deleted
--- *
 directiveLineP :: Int -> Parser ManPageLine
 directiveLineP line_num = do
   dir <- takeWhile1P' (/= ' ')

@@ -46,9 +46,10 @@ data CharParseResult
   = Consume    { _consumeCount :: !Int, _parseResult :: !Text }
   | SwitchFont { _consumeCount :: !Int, _fontName :: !Font }
   | Connect
+  deriving (Eq, Show)
 
 data Font = Bold | Italic | Roman
-  deriving Eq
+  deriving (Eq, Show)
 
 data OpenBracket = Paren | Square
 
@@ -88,7 +89,7 @@ charLiteral :: MonadChars e s m => m CharParseResult
 charLiteral = label "man page char literal" $ do
   -- The @~@ is needed to avoid requiring a MonadFail constraint,
   -- and we do know that r will be non-empty if count' succeeds.
-  ~(x:y) <- lookAhead $ count' 1 2 C.anyChar
+  ~(x:y) <- lookAhead $ count' 1 3 C.anyChar
   case x of
     '\n' -> unexpected (Tokens ('\n':|[])) <?> "End of line"
     '\\' -> case y of
@@ -124,7 +125,7 @@ charLiteral = label "man page char literal" $ do
         'P':_ -> pure (SwitchFont 3 Roman) -- TODO: where is this specified
         'R':_ -> pure (SwitchFont 3 Roman)
         _ -> unexpected (Tokens ('\\':|('f':z))) <?> unknown_font_msg
-    c -> one 1 c
+    c -> one 1 c -- (if c == 'f' then error "f!" else one 1 c)
   where
     one cnt c = pure (Consume cnt (T.singleton c))
     unimpl_msg = "Don't know how to handle this case yet."
@@ -138,7 +139,7 @@ space1NoNL = void (takeWhile1P (Just "space no newline")
 data NewlineResult = Leave1Space | NoSpace
 
 newline :: MonadRoff e s m => m NewlineResult
-newline = newline >> do
+newline = C.newline >> do
   PS{connect} <- get
   put initialPS
   pure (if connect then NoSpace else Leave1Space)
@@ -155,12 +156,17 @@ directiveArgCharP :: MonadRoff e s m => (Char -> Bool) -> String -> m AnnText
 directiveArgCharP isBad msg = charLiteral >>= \case
   Consume 1 c | isBad (T.head c) -> unexpected (Tokens (T.head c :| [])) <?> msg
   Consume i t -> skipCount i C.anyChar *> annText t
-  SwitchFont i f -> skipCount i C.anyChar *> switchFont f *> directiveArgCharP isBad msg
-  Connect -> skipCount 2 C.anyChar *> turnConnectOn *> directiveArgCharP isBad msg
+  SwitchFont i f -> skipCount i C.anyChar *> switchFont f *>
+    (directiveArgCharP isBad msg <|> annText "")
+  Connect -> skipCount 2 C.anyChar *> turnConnectOn *>
+    (directiveArgCharP isBad msg <|> annText "")
   where
     annText = (Pair <$> gets curFont <*>) . pure
     turnConnectOn = modify (\ps -> ps{connect = True})
-    switchFont f = modify (\ps -> ps{curFont = f})
+    switchFont f =
+      -- if f == Bold then error "blowup switchFont"
+      -- else error ("blowup! font = " ++ show f)
+      modify (\ps -> ps{curFont = f})
 
 directiveArgChar1P :: MonadRoff e s m => m AnnText
 directiveArgChar1P = directiveArgCharP (== '"') "Got double quote"
@@ -179,13 +185,19 @@ type Words a = [a]
 
 lineP :: MonadRoff e Text m => m (Text, Words [AnnText])
 lineP = do
-  c <- C.anyChar
+  c <- lookAhead C.anyChar
   case c of
-    '.' -> opt1
-    '\'' -> undefined
-    _ -> ( ,[]) <$> takeWhileP Nothing (/= '\n')
+    '.' -> skipCount 1 C.anyChar *> opt1
+            -- Skip these as preprocessor is handled separately
+    '\'' -> skipCount 1 C.anyChar *> pure ("", [])
+    _ -> ("",) . (:[]) . coalesce . filter (not . T.null . pairSnd) <$> lineP'
   where
+    lineP' = many (directiveArgCharP (const False) "Unreachable")
     opt1 = do
       cmd  <- lexeme (takeWhile1P' (not . isSpace))
       args <- many (lexeme directiveArgP)
       pure (cmd, args)
+
+preprocessorLineP :: MonadRoff e Text m => m Text
+preprocessorLineP = C.string "'\\\""
+  *> (T.strip <$> takeWhile1P Nothing (/= '\n'))
