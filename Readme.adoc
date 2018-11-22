@@ -23,11 +23,9 @@ toc::[]
   ** [*] Help pages
   ** [ ] Man pages
 * [ ] Follow links inside man/help pages with hints.
-  ** TODO: insert GIF
   ** [*] Help pages
   ** [ ] Man page
 * [ ] Automatic detection of subcommand help pages.
-  ** TODO: insert GIF
   ** [*] Help pages
   ** [ ] Man pages
 * [*] Configurable keybindings with hot-reloading.
@@ -73,8 +71,12 @@ instead of `stack install`. This will install `ozil` to `~/.cabal/bin`.
 
 If you want to see the help for `foo`, run `ozil foo`. If you want to see the
 help for `foo bar` (where `bar` is a subcommand of `foo`) run `ozil 'foo bar'`.
-That's mostly it. `ozil` will guide you as needed. Of course, you can try using
-`ozil ozil` as well :smile:.
+
+If you're want a man page from a specific section (e.g. `man(1)`), you can use
+`ozil man.1`.
+
+That's mostly it. `ozil` will guide you as needed. In case of ambiguities, it
+will present you with an option to make a choice and possibly save that choice.
 
 ### Configuration
 

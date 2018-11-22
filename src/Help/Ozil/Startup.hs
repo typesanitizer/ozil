@@ -84,9 +84,6 @@ mkPreferenceText :: FileName -> [Subcommand] -> Text
 mkPreferenceText fname subcs =
   T.intercalate " " (pack fname : map (pack . show) subcs)
 
--- TODO: Check the Config if it already has a default for the request binary.
--- If we have a saved default, and it is available in the filesystem, then
--- return it. Otherwise, go through the effort of checking stuff.
 getPreferredCandidate :: Startup (Maybe DocPageSummary)
 getPreferredCandidate = do
   opts <- view options
@@ -116,20 +113,22 @@ getManPageSummaries = do
       liftIO $ do
       -- FIXME: whatis may not recognize everything (if mandb hasn't been run
       -- recently), so we might actually need to run man as well.
-      (ecode, out, _) <- readProcessWithExitCode "whatis" ["-w", go p] ""
+      (ecode, out, _) <- readProcessWithExitCode "whatis" (whatis_args p) ""
       pure $ case ecode of
         ExitFailure _ -> []
         -- TODO: We should log the errors and suggest the user report them
         -- on GitHub, or perhaps we can submit a GitHub request ourselves.
         ExitSuccess   -> rights (map parseManPageSummary (lines out))
   where
-    go InputPath{} = unimplementedError
+    whatis_args InputPath{} = unimplementedError
     -- FIXME: This logic is wrong. If someone says man.1 then we should check
     -- section 1 only.
-    go (InputFile ty nm) = case ty of
-      Binary           -> nm
-      ManPage Unzipped -> dropExtension nm
-      ManPage Zipped   -> dropExtension (dropExtension nm)
+    whatis_args (InputFile ty nm) = case ty of
+      Binary           -> ["-w", nm]
+      ManPage Unzipped -> let (nm', sec) = splitExtension nm
+                          in ["-w", nm', "-s", sec]
+      ManPage Zipped   ->
+        whatis_args (InputFile (ManPage Unzipped) (dropExtension nm))
 
 -- TODO: Extend this to allow for multiple help pages.
 -- For example, if you're working on something which you also install
