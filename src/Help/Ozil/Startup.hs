@@ -7,14 +7,15 @@ module Help.Ozil.Startup
 
 import Commons
 
-import Help.Subcommand (Subcommand)
-import Help.Page
 import Help.Ozil.Cmd
 import Help.Ozil.Startup.Core
+import Help.Page
 
-import Help.Page.Lenses (name, section, shortDescription)
+import Development.BuildSystem (checkTillRoot, buildSystems)
 import Help.Ozil.Config (getConfig, Config, saveConfig)
 import Help.Ozil.Config.Types (getPagePath, mkChoice, savedPreferences, userConfig)
+import Help.Page.Lenses (name, section, shortDescription)
+import Help.Subcommand (Subcommand)
 
 import qualified Help.Ozil.Config.Default as Default
 
@@ -22,7 +23,9 @@ import System.FilePath
 
 import Brick (App (..))
 import Data.Either (rights)
+import Data.Traversable (for)
 import Lens.Micro ((^?!))
+import System.Directory (getCurrentDirectory)
 import System.Exit (ExitCode (..))
 import System.Process (readProcessWithExitCode)
 
@@ -38,7 +41,7 @@ import qualified Graphics.Vty as Vty
 --------------------------------------------------------------------------------
 -- * Exports
 
--- | Run the startup "application", returning the docpage to be views and the
+-- | Run the startup "application", returning the docpage to be viewed and the
 -- proper configuration.
 --
 -- NOTE: This function might kill the application because we actually don't want
@@ -130,11 +133,6 @@ getManPageSummaries = do
       ManPage Zipped   ->
         whatis_args (InputFile (ManPage Unzipped) (dropExtension nm))
 
--- TODO: Extend this to allow for multiple help pages.
--- For example, if you're working on something which you also install
--- globally, then running
--- @stack exec foo -- --help@ VS @foo --help@
--- may give different results.
 getHelpPageSummaries :: HasCallStack => Startup [HelpPageSummary]
 getHelpPageSummaries = do
   cmd <- view optCommand
@@ -146,12 +144,20 @@ getHelpPageSummaries = do
       -- https://unix.stackexchange.com/q/85249/89474
       -- However, 'command' might be a shell built-in, and I'm not sure how to
       -- use the API in System.Process to call shell commands and capture stdout.
-      sys_binpaths <- readProcessSimple "which" [nm]
-      check sys_binpaths $ \txt ->
-        fmap catMaybes . forM (T.lines txt) $ \path -> do
-          let rest = cmd ^?! _Default.inputs.subcommandPath
-              path' = unpack path -- <> rest
-          getHelpPageSummary (Global path') rest
+      global_binpaths <- readProcessSimple "which" [nm]
+      let subcs = cmd ^?! _Default.inputs.subcommandPath
+      global_helps <- check global_binpaths $ \txt ->
+        tryEach (T.lines txt) $ \path -> do
+          let path' = unpack path
+          getHelpPageSummary (Global path') subcs
+      local_helps <- tryEach buildSystems $ \bs -> do
+        exists <- checkTillRoot bs
+        cwd <- getCurrentDirectory
+        if not exists then pure Nothing
+        else getHelpPageSummary (Local cwd bs nm) subcs
+      pure (global_helps <> local_helps)
+  where
+    tryEach f = fmap catMaybes . for f
 
 check :: (Applicative f, Monoid b) => Maybe a -> (a -> f b) -> f b
 check x f = maybe (pure mempty) f x
@@ -174,7 +180,7 @@ highlightSelection :: Brick.AttrMap
 highlightSelection = Brick.attrMap Vty.defAttr
   [(W.buttonSelectedAttr, Vty.withStyle Vty.defAttr Vty.standout)]
 
-------------------------------------------------------------
+----------------------------------------------------------------------
 -- ** Main selection app
 
 selectionApp :: Int -> NonEmpty DocPageSummary -> App Int () Int
@@ -214,8 +220,11 @@ selectionAppHandleEvent len i = \case
   _ -> Brick.continue i
   where p = W.Pos{W.idx=i, W.len}
 
-------------------------------------------------------------
+----------------------------------------------------------------------
 -- ** Save dialog box
+
+data Selection = Selection { _idx :: !Int, _save :: !Bool }
+  deriving (Eq, Show)
 
 saveSelectionApp :: DocPageSummary -> App Selection () Int
 saveSelectionApp dp = App
@@ -236,8 +245,6 @@ saveSelectionAppDraw _ ss =
       60
     ) W.emptyWidget
   ]
-  -- TODO: Add an option for "No. Don't prompt me again for this in the future."
-  -- Maybe that should only be an option in the config file and not in the TUI?
   where
     button_idx = if _save ss then 0 else 1
     buttons = [("Yes", ss{_save = True}), ("No", ss{_save = False})]
@@ -264,6 +271,3 @@ summaryButtonStr = \case
           splitAt (selectionAppDialogWidth - length s1 - 8) (w ^. shortDescription)
         s2 = s2pre ++ (if null post'' then post' else "...")
     in printf "%s - %s" s1 s2
-
-data Selection = Selection { _idx :: !Int, _save :: !Bool }
-  deriving (Eq, Show)

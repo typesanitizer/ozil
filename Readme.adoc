@@ -29,6 +29,8 @@ toc::[]
   ** [*] Help pages
   ** [ ] Man pages
 * [*] Configurable keybindings with hot-reloading.
+* [*] Automatic search for local, project-specific executables based on your
+      build system (contributions to support more build systems are welcome!).
 
 image:https://i.imgur.com/vz4pPug.gif[Ozil - demo with subcommand detection and links, width=640]
 

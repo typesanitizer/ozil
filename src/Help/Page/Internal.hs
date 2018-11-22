@@ -2,6 +2,7 @@ module Help.Page.Internal where
 
 import Commons (Generic, Text)
 
+import Development.BuildSystem
 import Help.Page.Help (HelpPage)
 import Help.Page.Man (ManPage (..), WhatisDescription (..))
 import Help.Subcommand (Subcommand)
@@ -33,23 +34,6 @@ data BinaryPath
   = Global FilePath
   | Local FilePath BuildSystem BinName -- ^ The FilePath is the project folder.
   deriving (Eq, Show, Generic)
-
-data BuildSystem = Cabal | Cargo | Stack
-  deriving (Eq, Show, Generic)
-
-instance ToJSON BuildSystem where
-  toJSON = \case
-    Stack -> String "stack"
-    Cabal -> String "cabal"
-    Cargo -> String "cargo"
-
-instance FromJSON BuildSystem where
-  parseJSON (String s) = case s of
-    "cabal" -> pure Cabal
-    "cargo" -> pure Cargo
-    "stack" -> pure Stack
-    _ -> fail "Unrecognized build system."
-  parseJSON invalid = typeMismatch "Build system" invalid
 
 type BinName = String
 

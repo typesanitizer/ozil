@@ -81,6 +81,7 @@ library
       Control.Lens.Extra
       Data.Focused
       Data.Pair
+      Development.BuildSystem
       Help.Page
           Help.Page.Help
           Help.Page.Internal

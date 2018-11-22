@@ -9,7 +9,7 @@ module Help.Page
   , parseManPageSummary
   , HelpPageSummary (..)
   , displayHelpPageSummary
-  , BinaryPath (Global)
+  , BinaryPath (Global, Local)
 
   , PagePath
   , summaryToPath
@@ -33,6 +33,7 @@ module Help.Page
 
 import Commons
 
+import Development.BuildSystem (mkExecArgs)
 import Help.Page.Help
 import Help.Page.Internal
 import Help.Page.Lenses (binaryPath, section, name, subcommandPath, anchors)
@@ -107,10 +108,7 @@ getManPage mps = do
 mkProcessArgs :: BinaryPath -> [Subcommand] -> (String, [String])
 mkProcessArgs bp subcs = case bp of
   Global fp -> (fp, map show subcs)
-  Local _pf bs bin -> case bs of
-    Stack -> ("stack", ["exec", bin, "--"])
-    Cabal -> ("cabal", ["v2-exec", bin, "--"])
-    Cargo -> ("cargo", ["run", bin, "--"])
+  Local _pf bs bin -> mkExecArgs bs bin subcs
 
 getHelpPageSummary :: BinaryPath -> [Subcommand] -> IO (Maybe HelpPageSummary)
 getHelpPageSummary binPath subcPath = do
