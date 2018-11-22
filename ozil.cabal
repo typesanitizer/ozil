@@ -11,7 +11,7 @@ copyright:      2018 Varun Gandhi
 license:        BSD3
 build-type:     Simple
 extra-source-files:
-    Readme.adoc
+    Readme.md
     ChangeLog.md
 
 source-repository head
