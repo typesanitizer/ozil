@@ -24,7 +24,7 @@ module Help.Ozil.Core
   , newOState
   ) where
 
-import Commons hiding (to)
+import Commons
 
 import Help.Page
   ( displayHelpPageSummary, ManPageSummary, getNewSubcommand

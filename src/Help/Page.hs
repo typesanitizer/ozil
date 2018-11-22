@@ -112,9 +112,9 @@ mkProcessArgs bp subcs = case bp of
 
 getHelpPageSummary :: BinaryPath -> [Subcommand] -> IO (Maybe HelpPageSummary)
 getHelpPageSummary binPath subcPath = do
-  d1 <- go ["-h"]
-  d2 <- fmap (mkHPS False) <$> go ["--help"]
-  pure $ maybe d2 (Just . mkHPS True) d1
+  d1 <- go ["--help"]
+  d2 <- fmap (mkHPS True) <$> go ["-h"]
+  pure $ maybe d2 (Just . mkHPS False) d1
   where
     mkHPS = HelpPageSummary binPath subcPath
     go hstr = uncurry readProcessSimple $ (<> hstr)

@@ -4,7 +4,20 @@
 {-# LANGUAGE ViewPatterns        #-}
 {-# LANGUAGE DeriveAnyClass      #-}
 
-module Brick.FastMarkup where
+module Brick.FastMarkup
+  (
+  -- * Public API
+    FastMarkup
+  , mkFastMarkup
+  , fmWrap
+
+  -- * Testing API
+  , Entry (..)
+  , Emptiness (..)
+  , tokenize
+  , wrapLines
+  , Token (..)
+  ) where
 
 import Commons
 

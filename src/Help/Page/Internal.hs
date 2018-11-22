@@ -22,12 +22,11 @@ instance Eq DocPage where
 
 type ManPageSummary = WhatisDescription
 
--- FIXME: Erm, these record field names don't make sense. Available and Text?
 data HelpPageSummary = HelpPageSummary
-  { _binaryPath         :: BinaryPath
-  , _subcommandPath     :: [Subcommand]
-  , _shortHelpAvailable :: !Bool
-  , _shortHelpText      :: Text
+  { _binaryPath     :: BinaryPath
+  , _subcommandPath :: [Subcommand]
+  , _isShortHelp    :: !Bool
+  , _helpText       :: Text
   } deriving (Eq, Show)
 
 data BinaryPath
