@@ -1,7 +1,7 @@
 cabal-version: 1.12
 
 name:           ozil
-version:        0.0.1.0
+version:        0.1.0.0
 description:    Please see the Readme on Github at <https://github.com/theindigamer/ozil#readme>
 homepage:       https://github.com/theindigamer/ozil#readme
 bug-reports:    https://github.com/theindigamer/ozil/issues

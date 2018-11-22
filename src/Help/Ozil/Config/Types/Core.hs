@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds      #-}
 {-# LANGUAGE KindSignatures #-}
 
+-- | We use type families to model the configuration changing with time.
 module Help.Ozil.Config.Types.Core where
 
 import Help.Ozil.KeyBinding
@@ -18,6 +19,9 @@ import Help.Page (summaryToPath, DocPageSummary, PagePath)
 import qualified Data.List.NonEmpty as NE
 
 data Version = V1_0
+
+instance Show Version where
+  show V1_0 = "1.0"
 
 type family SystemInfoF (v :: Version) :: Type
 type instance SystemInfoF 'V1_0 = SystemInfoV1_0
@@ -68,15 +72,21 @@ data UserConfigV1_0 = UserConfigV1_0
   } deriving Show
 
 instance FromJSON UserConfigV1_0 where
-  parseJSON (Object o) = UserConfigV1_0
-    <$> o .: "saved-preferences"
-    <*> o .: "key-bindings"
-    <*> pure ()
+  parseJSON (Object o) = do
+    v <- o .: "version"
+    guard (v == show V1_0)
+    UserConfigV1_0
+      <$> o .: "saved-preferences"
+      <*> o .: "key-bindings"
+      <*> pure ()
   parseJSON invalid = typeMismatch "User Config" invalid
 
 instance ToJSON UserConfigV1_0 where
   toJSON UserConfigV1_0{_savedPreferences, _keyBindings} = object
-    ["saved-preferences" .= _savedPreferences, "key-bindings" .= _keyBindings]
+    [ "version" .= show V1_0
+    , "saved-preferences" .= _savedPreferences
+    , "key-bindings" .= _keyBindings
+    ]
 
 data SystemInfoV1_0 = SystemInfoV1_0
   { _ozilConfigFileExists :: !(Maybe FilePath)

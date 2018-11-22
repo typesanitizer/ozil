@@ -1,4 +1,5 @@
 {-# LANGUAGE ViewPatterns #-}
+
 module Help.Page
   ( DocPage (..)
   , parseHelpPage
