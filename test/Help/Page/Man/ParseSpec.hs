@@ -37,12 +37,14 @@ spec_charLiteral = it "char literal" $ do
 
 spec_lineP :: Spec
 spec_lineP = it "line parsing" $ do
-  go [r|.TH "foo" "bar" |] `shouldBeOk` ("TH", ["foo", "bar"])
-  go [r|.X arg \"blah|] `shouldBeOk` ("X", ["arg"])
-  go [r|.BR abcd \-\-foo|] `shouldBeOk` ("BR", ["abcd", "--foo"])
-  go' [r|\fBqux\fP|] `shouldBeOk` ("", [[(Bold, "qux")]])
-  go' [r|\fBqux\fP \fIbar\fP|] `shouldBeOk`
-        ("", [[(Bold, "qux"), (Roman, " "), (Italic, "bar")]])
+  go [r|.TH "foo" "bar" |] `shouldBeOk` Directive "TH" ["foo", "bar"]
+  go [r|.X arg \"blah|] `shouldBeOk` Directive "X" ["arg"]
+  go [r|.BR abcd \-\-foo|] `shouldBeOk` Plain [Bold ~~ "abcd", Roman ~~ "--foo"]
+  go [r|\fBqux\fP|] `shouldBeOk` Plain [Bold ~~ "qux"]
+  go [r|\fBqux\fP \fIbar\fP|] `shouldBeOk`
+     Plain [Bold ~~ "qux", Roman ~~ " ", Italic ~~ "bar"]
+        -- ("", [[(Bold, "qux"), (Roman, " "), (Italic, "bar")]])
   where
-    go = fmap (fmap (fmap forgetFont)) . tryParse lineP
-    go' = fmap (fmap (fmap (fmap pairToTuple))) . tryParse lineP
+    (~~) = Pair
+    go = tryParse lineP
+    -- go' = fmap (fmap (fmap (fmap pairToTuple))) . tryParse lineP

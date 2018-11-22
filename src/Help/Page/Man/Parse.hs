@@ -183,20 +183,36 @@ directiveArgP =
 
 type Words a = [a]
 
-lineP :: MonadRoff e Text m => m (Text, Words [AnnText])
+data Line = Directive Text [Text] | Plain [AnnText]
+  deriving (Eq, Show)
+
+lineP :: MonadRoff e Text m => m Line
 lineP = do
   c <- lookAhead C.anyChar
   case c of
     '.' -> skipCount 1 C.anyChar *> opt1
             -- Skip these as preprocessor is handled separately
-    '\'' -> skipCount 1 C.anyChar *> pure ("", [])
-    _ -> ("",) . (:[]) . coalesce . filter (not . T.null . pairSnd) <$> lineP'
+    '\'' -> skipCount 1 C.anyChar *> pure (Plain [])
+    _ -> Plain . coalesce . filter (not . T.null . pairSnd) <$> lineP'
   where
     lineP' = many (directiveArgCharP (const False) "Unreachable")
-    opt1 = do
-      cmd  <- lexeme (takeWhile1P' (not . isSpace))
-      args <- many (lexeme directiveArgP)
-      pure (cmd, args)
+    opt1 = decorate
+      <$> lexeme (takeWhile1P' (not . isSpace))
+      <*> many (lexeme directiveArgP)
+
+decorate :: Text -> Words [AnnText] -> Line
+decorate = go
+  where
+    setFont f = map (Pair f . forgetFont)
+    alternateFont f1 f2 = Plain . zipWith Pair (cycle [f1, f2]) . map forgetFont
+    go c [] = Directive c []
+    go "B" xs = Plain $ setFont Bold xs
+    go "I" xs = Plain $ setFont Italic xs
+    go "RB" xs = alternateFont Roman Bold xs
+    go "BR" xs = alternateFont Bold Roman xs
+    go "RI" xs = alternateFont Roman Italic xs
+    go "IR" xs = alternateFont Italic Roman xs
+    go c xs = Directive c (map forgetFont xs)
 
 preprocessorLineP :: MonadRoff e Text m => m Text
 preprocessorLineP = C.string "'\\\""

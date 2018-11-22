@@ -3,6 +3,8 @@
 `ozil` assists you with viewing man/help pages. It is intended as a
 porcelain for `man`/`--help` + `less`/`more`/`most`.
 
+[Note: Support for man pages is not yet ready.]
+
 ## Table of contents
 
 - [Features](#features)
