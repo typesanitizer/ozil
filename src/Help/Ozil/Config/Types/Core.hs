@@ -13,7 +13,7 @@ import Data.HashMap.Strict (HashMap)
 import Data.Kind (Type)
 import Data.List.NonEmpty (NonEmpty)
 import Data.Text (Text)
-import Help.Page (BinaryPath)
+import Help.Page (summaryToPath, DocPageSummary, PagePath)
 
 import qualified Data.List.NonEmpty as NE
 
@@ -37,7 +37,7 @@ data ConfigV1_0 = ConfigV1_0
   } deriving Show
 
 data ChoiceV1_0 = ChoiceV1_0
-  { _options :: NonEmpty BinaryPath
+  { _options :: NonEmpty PagePath
   , _choice  :: Int
   } deriving Show
 
@@ -52,6 +52,12 @@ instance FromJSON ChoiceV1_0 where
 instance ToJSON ChoiceV1_0 where
   toJSON ChoiceV1_0{_options, _choice} =
     object ["options" .= _options, "choice" .= _choice]
+
+mkChoice :: Int -> NonEmpty DocPageSummary -> ChoiceV1_0
+mkChoice i dps = ChoiceV1_0 { _options = fmap summaryToPath dps, _choice = i }
+
+getPagePath :: ChoiceV1_0 -> PagePath
+getPagePath ChoiceV1_0{_options, _choice} = _options NE.!! _choice
 
 type KeyBindings = HashMap Action (NonEmpty KeyBinding)
 

@@ -201,8 +201,6 @@ keybindingHUD ls kbs = Brick.hBox (map Brick.vBox (transpose (row1 : rest)))
 
 debugWidget :: Page.DocPage -> Brick.Widget n
 debugWidget d =
-  Brick.strWrap (d & Page.displayDocPageSummary)
-  ===
   Brick.strWrap (("Anchors: " <>) . show $ d ^? helpPage . anchors)
   ===
   Brick.strWrap (("TableIxs: " <>) . show $ d ^? helpPage . tableIxs)

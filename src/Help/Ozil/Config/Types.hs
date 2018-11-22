@@ -4,6 +4,8 @@
 
 module Help.Ozil.Config.Types
   ( module Help.Ozil.Config.Types
+  , mkChoice
+  , getPagePath
   , KeyBindings
   ) where
 

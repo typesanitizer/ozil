@@ -7,18 +7,21 @@ module Help.Ozil.Startup
 
 import Commons
 
+import Help.Subcommand (Subcommand)
 import Help.Page
 import Help.Ozil.Cmd
 import Help.Ozil.Startup.Core
 
 import Help.Page.Lenses (name, section, shortDescription)
-import Help.Ozil.Config (getConfig, Config)
+import Help.Ozil.Config (getConfig, Config, saveConfig)
+import Help.Ozil.Config.Types (getPagePath, mkChoice, savedPreferences, userConfig)
 
 import qualified Help.Ozil.Config.Default as Default
 
 import System.FilePath
 
 import Brick (App (..))
+import Data.Either (rights)
 import Lens.Micro ((^?!))
 import System.Exit (ExitCode (..))
 import System.Process (readProcessWithExitCode)
@@ -27,6 +30,7 @@ import qualified Brick
 import qualified Brick.Widgets.Core as W
 import qualified Brick.Widgets.Dialog as W
 import qualified Brick.Widgets.GDialog as W
+import qualified Data.HashMap.Strict as H
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import qualified Graphics.Vty as Vty
@@ -48,11 +52,22 @@ finishStartup o = do
     [dp] -> (, cfg) . fromMaybe err <$> getDocPage dp
     h:tl -> do
       (dp, ss) <- runSelectionApp (h:|tl)
-      (, save ss dp cfg) . fromMaybe err <$> getDocPage dp
+      let cfg' = save ss (h:|tl) cfg
+      when (_save ss) $ void (saveConfig o cfg')
+      (, cfg') . fromMaybe err <$> getDocPage dp
   where
     err = error "Error: Expected to find a documentation page but couldn't.\n\
                 \This seems impossible, so what went wrong :(."
-    save ss = if coerce ss then savePreferredCandidate else flip const
+    inputs_ = o ^?! optCommand._Default.inputs
+    pref_txt = case inputs_ ^. primary of
+      InputPath{} -> unreachableError
+      InputFile (ManPage _) _ -> unreachableError
+      InputFile Binary fname ->
+        mkPreferenceText fname (inputs_ ^. subcommandPath)
+    save ss dps =
+      if _save ss
+      then savePreferredCandidate (_idx ss) dps pref_txt
+      else id
 
 --------------------------------------------------------------------------------
 -- * Fetching summaries
@@ -65,23 +80,39 @@ getCandidates = getPreferredCandidate >>= \case
     hs <- getHelpPageSummaries
     pure (map ManSummary ms ++ map HelpSummary hs)
 
+mkPreferenceText :: FileName -> [Subcommand] -> Text
+mkPreferenceText fname subcs =
+  T.intercalate " " (pack fname : map (pack . show) subcs)
+
 -- TODO: Check the Config if it already has a default for the request binary.
 -- If we have a saved default, and it is available in the filesystem, then
 -- return it. Otherwise, go through the effort of checking stuff.
 getPreferredCandidate :: Startup (Maybe DocPageSummary)
-getPreferredCandidate = pure Nothing
+getPreferredCandidate = do
+  opts <- view options
+  let inputs_ = opts ^?! optCommand._Default.inputs
+  case inputs_ ^. primary of
+    InputPath{} -> pure Nothing
+    InputFile (ManPage _) _ -> pure Nothing
+    InputFile Binary fname -> do
+      let txt = mkPreferenceText fname (inputs_ ^. subcommandPath)
+          subcs = inputs_ ^. subcommandPath
+      choice <- inspectConfig
+        (\cfg -> H.lookup txt (cfg ^. userConfig . savedPreferences))
+      liftIO (join <$> traverse (getSummary subcs . getPagePath) choice)
 
--- TODO: Modify the config appropriately...
-savePreferredCandidate :: DocPageSummary -> Config -> Config
-savePreferredCandidate _ = id
+savePreferredCandidate
+  :: Int -> NonEmpty DocPageSummary -> Text -> Config -> Config
+savePreferredCandidate i dps inp_txt =
+  over (userConfig . savedPreferences) (H.insert inp_txt (mkChoice i dps))
 
 getManPageSummaries :: HasCallStack => Startup [ManPageSummary]
 getManPageSummaries = do
   cmd <- view optCommand
-  case cmd ^? _Default.inputs.primary of
-    Nothing -> pure mempty
-    Just InputPath{}   -> unimplementedErrorM
-    Just p@InputFile{} ->
+  check (cmd ^? _Default.inputs.primary) $ \case
+    InputPath{}   -> unimplementedErrorM
+    (InputFile ManPage{} _) -> unimplementedErrorM
+    p@InputFile{} ->
       liftIO $ do
       -- FIXME: whatis may not recognize everything (if mandb hasn't been run
       -- recently), so we might actually need to run man as well.
@@ -93,6 +124,8 @@ getManPageSummaries = do
         ExitSuccess   -> rights (map parseManPageSummary (lines out))
   where
     go InputPath{} = unimplementedError
+    -- FIXME: This logic is wrong. If someone says man.1 then we should check
+    -- section 1 only.
     go (InputFile ty nm) = case ty of
       Binary           -> nm
       ManPage Unzipped -> dropExtension nm
@@ -108,7 +141,7 @@ getHelpPageSummaries = do
   cmd <- view optCommand
   check (cmd ^? _Default.inputs.primary) $ \case
     InputPath{} -> unimplementedErrorM
-    InputFile i@ManPage{} _ -> liftIO (print i) >> pure []
+    InputFile ManPage{} _ -> pure []
     InputFile Binary nm -> liftIO $ do
       -- FIXME: Calling 'which' is not portable.
       -- https://unix.stackexchange.com/q/85249/89474
@@ -119,22 +152,23 @@ getHelpPageSummaries = do
         fmap catMaybes . forM (T.lines txt) $ \path -> do
           let rest = cmd ^?! _Default.inputs.subcommandPath
               path' = unpack path -- <> rest
-          getHelpPageSummary (Simple path') rest
-  where
-    check x f = case x of Nothing -> pure []; Just z -> f z
+          getHelpPageSummary (Global path') rest
+
+check :: (Applicative f, Monoid b) => Maybe a -> (a -> f b) -> f b
+check x f = maybe (pure mempty) f x
 
 --------------------------------------------------------------------------------
 -- * Selection process
 
 runSelectionApp
   :: NonEmpty DocPageSummary
-  -> IO (DocPageSummary, SaveSelection)
+  -> IO (DocPageSummary, Selection)
 runSelectionApp dps = do
   let len = NE.length dps
   i <- Brick.defaultMain (selectionApp len dps) 0
   let dp = assert (0 <= i && i < len) (dps NE.!! i)
   -- TODO: We should use this app and then save the configuration.
-  ss <- Brick.defaultMain (saveSelectionApp dp) DontSave
+  ss <- Brick.defaultMain (saveSelectionApp dp) (Selection i False)
   pure (dp, ss)
 
 highlightSelection :: Brick.AttrMap
@@ -184,7 +218,7 @@ selectionAppHandleEvent len i = \case
 ------------------------------------------------------------
 -- ** Save dialog box
 
-saveSelectionApp :: DocPageSummary -> App SaveSelection () Int
+saveSelectionApp :: DocPageSummary -> App Selection () Int
 saveSelectionApp dp = App
   { appDraw = saveSelectionAppDraw dp
   , appChooseCursor = Brick.showFirstCursor
@@ -193,32 +227,34 @@ saveSelectionApp dp = App
   , appAttrMap = const highlightSelection
   }
 
-saveSelectionAppDraw :: p -> SaveSelection -> [Brick.Widget n]
+saveSelectionAppDraw :: p -> Selection -> [Brick.Widget n]
 saveSelectionAppDraw _ ss =
   [ W.renderGDialog
     ( W.HDialog $ W.dialog
       (Just " Would you like to save this choice for the future? \n\
             \ (Sorry, this doesn't actually work at the moment.) ")
-      (Just (fromEnum ss, buttons))
+      (Just (button_idx, buttons))
       60
     ) W.emptyWidget
   ]
   -- TODO: Add an option for "No. Don't prompt me again for this in the future."
   -- Maybe that should only be an option in the config file and not in the TUI?
-  where buttons = [("Yes", Save), ("No", DontSave)]
+  where
+    button_idx = if _save ss then 0 else 1
+    buttons = [("Yes", ss{_save = True}), ("No", ss{_save = False})]
 
 saveSelectionAppHandleEvent
-  :: SaveSelection
+  :: Selection
   -> Brick.BrickEvent n1 e
-  -> Brick.EventM n2 (Brick.Next SaveSelection)
+  -> Brick.EventM n2 (Brick.Next Selection)
 saveSelectionAppHandleEvent s = \case
   Brick.VtyEvent ev ->
     case W.simpleHandleEvent p W.H ev of
-      W.Next i' -> Brick.continue (toEnum i')
+      W.Next i' -> Brick.continue s{_save = i' == 0}
       W.Done    -> Brick.halt s
       W.Unknown -> Brick.continue s
   _ -> Brick.continue s
-  where p = W.Pos{W.idx=fromEnum s, W.len=2}
+  where p = W.Pos { W.idx = if _save s then 0 else 1, W.len = 2 }
 
 summaryButtonStr :: DocPageSummary -> String
 summaryButtonStr = \case
@@ -230,19 +266,5 @@ summaryButtonStr = \case
         s2 = s2pre ++ (if null post'' then post' else "...")
     in printf "%s - %s" s1 s2
 
-newtype SaveSelection = SaveSelection Bool
-  deriving Eq
-
-instance Enum SaveSelection where
-  toEnum = \case
-    0 -> Save
-    1 -> DontSave
-    _ -> unreachableError
-
-  fromEnum (SaveSelection b) = if b then 0 else 1
-
-{-# COMPLETE Save, DontSave #-}
-
-pattern Save, DontSave :: SaveSelection
-pattern Save = SaveSelection True
-pattern DontSave = SaveSelection False
+data Selection = Selection { _idx :: !Int, _save :: !Bool }
+  deriving (Eq, Show)

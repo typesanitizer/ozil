@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE UndecidableInstances   #-}
 {-# LANGUAGE TemplateHaskell        #-}
 
@@ -26,8 +27,9 @@ module Help.Ozil.Core
 import Commons hiding (to)
 
 import Help.Page
-  (getNewSubcommand, highlightedSubcommand, LinkState, mkLinkStateOff, DocPage
-  , displayHeading)
+  ( displayHelpPageSummary, ManPageSummary, getNewSubcommand
+  , highlightedSubcommand, LinkState, mkLinkStateOff, DocPage (..))
+import Help.Page.Lenses (section, name)
 import Help.Ozil.Config.Watch (WatchManager, FSEvent)
 import Help.Ozil.Config.Types
   (Config, HasKeyBindings (..), KeyBindings, userConfig)
@@ -126,3 +128,11 @@ newOState opts wm ch dp cfg = OState
   , _oStateHeading   = pack (displayHeading dp)
   , _oStateDebugMode = fromMaybe False (opts ^? optCommand._Default.debugMode)
   }
+
+displayHeading :: DocPage -> String
+displayHeading = \case
+  Man mps _ -> displayManPageSummary mps
+  Help hps _ -> displayHelpPageSummary hps
+
+displayManPageSummary :: ManPageSummary -> String
+displayManPageSummary mps = mps ^. name <> " " <> mps ^. section

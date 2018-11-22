@@ -15,7 +15,7 @@ import Commons
 
 import Help.Ozil.Config.Watch
 
-import Help.Ozil.Cmd (configPath, optCommand, Command (..), ConfigOptions (..))
+import Help.Ozil.Cmd (configPath, optCommand, Command (..), ConfigOptions (..), Options)
 import Help.Ozil.Config.Types (HasKeyBindings (..))
 import Help.Ozil.Console.Text (warn, prompt, pattern DefaultYes)
 import Help.Ozil.Startup.Core (options, modifyConfig, Startup)
@@ -78,9 +78,8 @@ foundConfigFile = do
       $ printf "Error: Expected a config file at %s but it wasn't found.\n\
                \Perhaps double-check the path?" x
 
-effectiveConfigPath :: Startup FilePath
-effectiveConfigPath =
-  fromMaybe Default.configPath <$> view (options . configPath)
+effectiveConfigPath :: Options -> FilePath
+effectiveConfigPath o = fromMaybe Default.configPath (o ^. configPath)
 
 newtype OzilFileExists = MkOzilFileExists Bool
 
@@ -122,11 +121,8 @@ createConfigFileIfApplicable ozilFileExists = view optCommand >>= \case
   initAction death = case ozilFileExists of
     OzilFileExists  -> death
     OzilFileMissing -> do
-      effcp <- effectiveConfigPath
-      liftIO $ do
-        createDirectoryIfMissing True (takeDirectory effcp)
-        BS.writeFile effcp
-          $ (encode . view Conf.userConfig) Default.config
+      opts <- view options
+      effcp <- liftIO $ saveConfig opts Default.config
       modifyConfig (set Conf.configFileExists (Just effcp))
   alreadyExistsMsg
     = "Error: configuration file already exists. \
@@ -146,7 +142,8 @@ readWriteConfig = \case
   -- TODO: Implement this.
   syncConfig = pure ()
   readConfig = do
-    effcp <- effectiveConfigPath
+    opts <- view options
+    let effcp = effectiveConfigPath opts
     mod_f <- liftIO $ getConfigSimple effcp
     case mod_f of
       Right f -> modifyConfig f
@@ -164,5 +161,10 @@ checkDbExists = pure True
 syncDbIfApplicable :: Bool -> Startup ()
 syncDbIfApplicable _ = pure ()
 
-saveConfig :: HasCallStack => Startup a
-saveConfig = unimplementedErrorM
+-- | Save the configuration and return the filepath where it was saved.
+saveConfig :: Options -> Conf.Config -> IO FilePath
+saveConfig opts cfg = do
+  let effcp = effectiveConfigPath opts
+  createDirectoryIfMissing True (takeDirectory effcp)
+  BS.writeFile effcp $ (encode . view Conf.userConfig) cfg
+  pure effcp

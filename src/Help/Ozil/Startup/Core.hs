@@ -14,6 +14,7 @@ module Help.Ozil.Startup.Core
   , options
   , showEnv
   , modifyConfig
+  , inspectConfig
   ) where
 
 import Commons
@@ -63,3 +64,9 @@ modifyConfig :: (Config -> Config) -> Startup ()
 modifyConfig f = do
   c <- view config
   liftIO $ modifyIORef c f
+
+inspectConfig :: (Config -> a) -> Startup a
+inspectConfig f = do
+  cref <- view config
+  c <- liftIO $ readIORef cref
+  pure (f c)

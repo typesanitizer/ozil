@@ -1,17 +1,18 @@
 {-# LANGUAGE ViewPatterns #-}
-
 module Help.Page
   ( DocPage (..)
   , parseHelpPage
   , parseManPage
   , DocPageSummary (..)
-  , displayDocPageSummary
-  , displayHeading
   , ManPageSummary
   , parseManPageSummary
   , HelpPageSummary (..)
   , displayHelpPageSummary
-  , BinaryPath (Simple)
+  , BinaryPath (Global)
+
+  , PagePath
+  , summaryToPath
+  , getSummary
 
   , LinkState
   , mkLinkStateOff
@@ -33,7 +34,7 @@ import Commons
 
 import Help.Page.Help
 import Help.Page.Internal
-import Help.Page.Lenses (section, name, subcommandPath, anchors)
+import Help.Page.Lenses (binaryPath, section, name, subcommandPath, anchors)
 
 import Help.Page.Man
   (ManPageView (..), ManPage (..), parseWhatisDescription, parseManPage)
@@ -58,18 +59,21 @@ import qualified Data.Vector.Generic as V
 import qualified Graphics.Vty as Vty
 
 --------------------------------------------------------------------------------
--- * Parsing
+-- * Working with summaries
 
+----------------------------------------------------------------------
+-- ** Parsing
 
---------------------------------------------------------------------------------
--- * Display
 parseManPageSummary :: String -> Either (ParseFail String) ManPageSummary
 parseManPageSummary = parseWhatisDescription
+
+----------------------------------------------------------------------
+-- ** User facing display
 
 displayHelpPageSummary :: HelpPageSummary -> String
 displayHelpPageSummary (HelpPageSummary bp scp sh _) =
   case bp of
-    Simple p -> unwords (abbrev p : map show scp <> [hstr])
+    Global p -> unwords (abbrev p : map show scp <> [hstr])
       where abbrev (splitFileName -> (ds, fn)) =
               let (dr, splitDirectories -> dirs) = splitDrive ds
                   middir = maybe ".." (</> "..") (headMaybe dirs)
@@ -79,16 +83,73 @@ displayHelpPageSummary (HelpPageSummary bp scp sh _) =
   where
     hstr = if sh then "-h" else "--help"
 
-displayDocPageSummary :: DocPage -> String
-displayDocPageSummary = \case
-  Man mps _ -> displayManPageSummary mps
-  Help hps _ -> displayHelpPageSummary hps
+----------------------------------------------------------------------
+-- ** Fetching documentation using summaries
 
-displayManPageSummary :: ManPageSummary -> String
-displayManPageSummary w = w ^. name <> " " <> w ^. section
+getDocPage :: DocPageSummary -> IO (Maybe DocPage)
+getDocPage = \case
+  ManSummary  m -> getManPage m
+  HelpSummary h -> getHelpPage h
 
-displayHeading :: DocPage -> String
-displayHeading = displayDocPageSummary
+-- TODO: Try to catch more errors here.
+getManPage :: ManPageSummary -> IO (Maybe DocPage)
+getManPage mps = do
+  let (n, s) = (mps ^. name, mps ^. section)
+  path <- trim <$> readProcess "man" ["-S", s, "-w", n] ""
+  -- TODO: Man pages might be in some other encoding like Latin1?
+  -- TODO: Man pages might be stored in other formats?
+  txt <- if takeExtension path == ".gz"
+    then T.decodeUtf8 . BS.toStrict . decompress <$> BS.readFile path
+    else T.readFile path
+  pure (Just (Man mps (parseManPage txt)))
+
+mkProcessArgs :: BinaryPath -> [Subcommand] -> (String, [String])
+mkProcessArgs bp subcs = case bp of
+  Global fp -> (fp, map show subcs)
+  Local _pf bs bin -> case bs of
+    Stack -> ("stack", ["exec", bin, "--"])
+    Cabal -> ("cabal", ["v2-exec", bin, "--"])
+    Cargo -> ("cargo", ["run", bin, "--"])
+
+getHelpPageSummary :: BinaryPath -> [Subcommand] -> IO (Maybe HelpPageSummary)
+getHelpPageSummary binPath subcPath = do
+  d1 <- go ["-h"]
+  d2 <- fmap (mkHPS False) <$> go ["--help"]
+  pure $ maybe d2 (Just . mkHPS True) d1
+  where
+    mkHPS = HelpPageSummary binPath subcPath
+    go hstr = uncurry readProcessSimple $ (<> hstr)
+      <$> mkProcessArgs binPath subcPath
+
+getManPageSummary :: Text -> Text -> IO (Maybe ManPageSummary)
+getManPageSummary (unpack -> name_) (unpack -> section_) = do
+  out <- readProcessSimple "whatis" [name_, "-s", section_]
+  let eitherToMaybe = \case Left _ -> Nothing; Right x -> Just x;
+  pure $ (eitherToMaybe . parseManPageSummary
+          <=< headMaybe . lines . unpack) =<< out
+
+getHelpPage :: HasCallStack => HelpPageSummary -> IO (Maybe DocPage)
+getHelpPage hsum@(HelpPageSummary binPath subcPath short _) =
+  let hstr = if short then ["-h"] else ["--help"]
+  in fmap (Help hsum . parseHelpPage) <$> go hstr
+  where
+    go hstr = uncurry readProcessSimple $ (<> hstr)
+      <$> mkProcessArgs binPath subcPath
+
+----------------------------------------------------------------------
+-- ** Saving summaries for later use
+
+summaryToPath :: DocPageSummary -> PagePath
+summaryToPath = \case
+  HelpSummary h -> HelpPath (h ^. binaryPath)
+  ManSummary w ->
+    ManPath { _fullName = pack (w ^. name), _section = pack (w ^. section) }
+
+getSummary :: [Subcommand] -> PagePath -> IO (Maybe DocPageSummary)
+getSummary subcs = \case
+  ManPath{_fullName, _section} ->
+    fmap ManSummary <$> getManPageSummary _fullName _section
+  HelpPath h -> fmap HelpSummary <$> getHelpPageSummary h subcs
 
 --------------------------------------------------------------------------------
 -- * Working with LinkState
@@ -133,56 +194,7 @@ getNewSubcommand subc dp = case dp of
     getHelpPage hsum'
 
 --------------------------------------------------------------------------------
--- * Fetching documentation
-
-getDocPage :: DocPageSummary -> IO (Maybe DocPage)
-getDocPage = \case
-  ManSummary  m -> getManPage m
-  HelpSummary h -> getHelpPage h
-
--- TODO: Try to catch more errors here.
-getManPage :: HasCallStack => ManPageSummary -> IO (Maybe DocPage)
-getManPage msum@(WhatisDescr w) = do
-  let (n, s) = (w ^. name, w ^. section)
-  path <- trim <$> readProcess "man" ["-S", s, "-w", n] ""
-  -- TODO: Man pages might be in some other encoding like Latin1?
-  -- TODO: Man pages might be stored in other formats?
-  txt <- if takeExtension path == ".gz"
-    then T.decodeUtf8 . BS.toStrict . decompress <$> BS.readFile path
-    else T.readFile path
-  pure (Just (Man msum (parseManPage txt)))
-getManPage (UnknownFormat _) =
-  -- TODO: Error handling
-  error "Error: Unexpected format for man page summary."
-
-mkProcessArgs :: BinaryPath -> [Subcommand] -> (String, [String])
-mkProcessArgs bp subcs = case bp of
-  Simple fp -> (fp, map show subcs)
-  Local bs bin -> case bs of
-    Stack -> ("stack", ["exec", bin, "--"])
-    Cabal -> ("cabal", ["v2-exec", bin, "--"])
-    Cargo -> ("cargo", ["run", bin, "--"])
-
-getHelpPageSummary :: BinaryPath -> [Subcommand] -> IO (Maybe HelpPageSummary)
-getHelpPageSummary binPath subcPath = do
-  d1 <- go ["-h"]
-  d2 <- fmap (mkHPS False) <$> go ["--help"]
-  pure $ maybe d2 (Just . mkHPS True) d1
-  where
-    mkHPS = HelpPageSummary binPath subcPath
-    go hstr = uncurry readProcessSimple $ (<> hstr)
-      <$> mkProcessArgs binPath subcPath
-
-getHelpPage :: HasCallStack => HelpPageSummary -> IO (Maybe DocPage)
-getHelpPage hsum@(HelpPageSummary binPath subcPath short _) =
-  let hstr = if short then ["-h"] else ["--help"]
-  in fmap (Help hsum . parseHelpPage) <$> go hstr
-  where
-    go hstr = uncurry readProcessSimple $ (<> hstr)
-      <$> mkProcessArgs binPath subcPath
-
---------------------------------------------------------------------------------
--- * Rendering
+-- * Rendering pages
 
 render :: LinkState -> DocPage -> Widget n
 render ls = \case

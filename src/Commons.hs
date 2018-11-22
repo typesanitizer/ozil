@@ -48,7 +48,7 @@ import Lens.Micro.Mtl (view)
 import Lens.Micro.TH
   (DefName (MethodName), makeLenses, camelCaseFields, lensField, makeLensesWith
   , makeFields)
-import Control.Monad (when, void, join, forM, forM_)
+import Control.Monad (when, void, join, forM, forM_, (<=<))
 import Control.Monad.IO.Class
 import Data.Char (toLower, toUpper)
 import Data.Coerce
