@@ -1,12 +1,11 @@
-{-| Default settings for everything.
-
-This module should be imported qualified.
--}
+-- | Default settings for everything.
+--
+-- This module should be imported qualified.
 module Help.Ozil.Config.Default where
 
-import Help.Ozil.KeyBinding
 import Help.Ozil.Config.Types
-import Help.Ozil.Config.Types.Core
+import Help.Ozil.Config.Types.Internal
+import Help.Ozil.KeyBinding
 
 import Data.List.NonEmpty (NonEmpty (..))
 import Data.String (IsString)

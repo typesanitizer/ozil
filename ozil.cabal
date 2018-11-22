@@ -95,7 +95,7 @@ library
           Help.Ozil.Config
               Help.Ozil.Config.Default
               Help.Ozil.Config.Types
-                  Help.Ozil.Config.Types.Core
+                  Help.Ozil.Config.Types.Internal
               Help.Ozil.Config.Watch
           Help.Ozil.Console.Text
           Help.Ozil.Core

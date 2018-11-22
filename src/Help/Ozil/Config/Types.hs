@@ -10,7 +10,7 @@ module Help.Ozil.Config.Types
   ) where
 
 import Commons
-import Help.Ozil.Config.Types.Core
+import Help.Ozil.Config.Types.Internal
 
 import Lens.Micro (Lens')
 import Lens.Micro.TH (makeLenses)
