@@ -45,10 +45,14 @@ data WhatisDescription = WhatisDescription
   , _whatisDescriptionShortDescription :: String
   } deriving (Eq, Show)
 
-parseWhatisDescription :: String -> Maybe WhatisDescription
-parseWhatisDescription = parseMaybe p
+parseWhatisDescription
+  :: String -> Either (ParseFail String) WhatisDescription
+parseWhatisDescription = annotate msg (parse p "")
   where
-    p :: Parsec Void String WhatisDescription
+    msg = "Couldn't parse the description given by whatis(1).\n\
+          \Usually, I'd expect it to have a name, followed by a section\n\
+          \(in parens) followed by a dash and some textual description."
+    p :: Parsec () String WhatisDescription
     p = do
       name <- lexeme binNameP
       sec <- between (char '(') (char ')') secNumP

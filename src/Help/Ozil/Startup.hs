@@ -88,7 +88,9 @@ getManPageSummaries = do
       (ecode, out, _) <- readProcessWithExitCode "whatis" ["-w", go p] ""
       pure $ case ecode of
         ExitFailure _ -> []
-        ExitSuccess   -> map parseManPageSummary (lines out)
+        -- TODO: We should log the errors and suggest the user report them
+        -- on GitHub, or perhaps we can submit a GitHub request ourselves.
+        ExitSuccess   -> rights (map parseManPageSummary (lines out))
   where
     go InputPath{} = unimplementedError
     go (InputFile ty nm) = case ty of
@@ -221,8 +223,7 @@ saveSelectionAppHandleEvent s = \case
 summaryButtonStr :: DocPageSummary -> String
 summaryButtonStr = \case
   HelpSummary h -> displayHelpPageSummary h
-  ManSummary (UnknownFormat s) -> s
-  ManSummary (WhatisDescr w) ->
+  ManSummary w ->
     let s1 = printf "%s(%s)" (w ^. name) (w ^. section) :: String
         (s2pre, splitAt 3 -> (post', post'')) =
           splitAt (selectionAppDialogWidth - length s1 - 8) (w ^. shortDescription)

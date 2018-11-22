@@ -19,10 +19,7 @@ instance Eq DocPage where
   (==) (Man ms1 _) (Man ms2 _) = ms1 == ms2
   (==) (Help hs1 _) (Help hs2 _) = hs1 == hs2
 
-data ManPageSummary
-  = WhatisDescr !WhatisDescription
-  | UnknownFormat { _shortDescription :: String }
-  deriving (Eq, Show)
+type ManPageSummary = WhatisDescription
 
 -- FIXME: Erm, these record field names don't make sense. Available and Text?
 data HelpPageSummary = HelpPageSummary

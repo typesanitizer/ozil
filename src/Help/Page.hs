@@ -7,7 +7,7 @@ module Help.Page
   , DocPageSummary (..)
   , displayDocPageSummary
   , displayHeading
-  , ManPageSummary (..)
+  , ManPageSummary
   , parseManPageSummary
   , HelpPageSummary (..)
   , displayHelpPageSummary
@@ -60,12 +60,11 @@ import qualified Graphics.Vty as Vty
 --------------------------------------------------------------------------------
 -- * Parsing
 
-parseManPageSummary :: String -> ManPageSummary
-parseManPageSummary s =
-  maybe (UnknownFormat s) WhatisDescr (parseWhatisDescription s)
 
 --------------------------------------------------------------------------------
 -- * Display
+parseManPageSummary :: String -> Either (ParseFail String) ManPageSummary
+parseManPageSummary = parseWhatisDescription
 
 displayHelpPageSummary :: HelpPageSummary -> String
 displayHelpPageSummary (HelpPageSummary bp scp sh _) =
@@ -86,9 +85,7 @@ displayDocPageSummary = \case
   Help hps _ -> displayHelpPageSummary hps
 
 displayManPageSummary :: ManPageSummary -> String
-displayManPageSummary = \case
-  WhatisDescr w -> w ^. name <> " " <> w ^. section
-  UnknownFormat s -> s
+displayManPageSummary w = w ^. name <> " " <> w ^. section
 
 displayHeading :: DocPage -> String
 displayHeading = displayDocPageSummary
@@ -98,7 +95,7 @@ displayHeading = displayDocPageSummary
 
 mkLinkStateOff :: DocPage -> LinkState
 mkLinkStateOff = \case
-  Man{} -> LinksOff 0 0 -- FIXME: Unimpelemented logic.
+  Man{} -> LinksOff 0 0 -- FIXME: Unimplemented logic.
   Help _ hp -> LinksOff (V.length (hp ^. anchors)) 0
 
 flipLinkState :: LinkState -> LinkState
