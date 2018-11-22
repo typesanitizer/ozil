@@ -9,7 +9,6 @@ import Commons
 
 import Help.Page
 import Help.Ozil.Cmd
-import Help.Ozil.Death
 import Help.Ozil.Startup.Core
 
 import Help.Page.Lenses (name, section, shortDescription)

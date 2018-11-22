@@ -14,7 +14,6 @@ module Help.Ozil.Config
 import Commons
 
 import Help.Ozil.Config.Watch
-import Help.Ozil.Death
 
 import Help.Ozil.Cmd (configPath, optCommand, Command (..), ConfigOptions (..))
 import Help.Ozil.Config.Types (HasKeyBindings (..))

@@ -11,8 +11,6 @@ module Help.Page.Help
 
 import Commons
 
-import Help.Ozil.Death (unreachableError)
-
 import Brick (textWidth)
 import Control.Monad.State.Strict
 import Data.Char (isSpace, isAlphaNum, isUpper)

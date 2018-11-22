@@ -1,5 +1,7 @@
 module Commons
-  ( module Control.DeepSeq
+  ( module Help.Ozil.Error
+
+  , module Control.DeepSeq
   , module Control.Exception
   , module Control.Monad
   , module Control.Monad.IO.Class
@@ -37,7 +39,7 @@ module Commons
   )
   where
 
-import Language.Haskell.TH (mkName, nameBase, Name, DecsQ)
+import Help.Ozil.Error
 
 import Control.DeepSeq (force, NFData(..))
 import Control.Exception (assert)
@@ -63,9 +65,9 @@ import qualified Data.Vector.Unboxed
 import Data.Void
 import GHC.Generics (Generic (..))
 import GHC.Stack (HasCallStack)
+import Language.Haskell.TH (mkName, nameBase, Name, DecsQ)
 import Text.Printf (printf)
 import Text.Megaparsec (MonadParsec, Tokens, Token, takeWhile1P)
-
 import System.Process (readProcessWithExitCode)
 import System.Exit (ExitCode (..))
 

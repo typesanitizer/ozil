@@ -99,7 +99,7 @@ library
               Help.Ozil.Config.Watch
           Help.Ozil.Console.Text
           Help.Ozil.Core
-          Help.Ozil.Death
+          Help.Ozil.Error
           Help.Ozil.KeyBinding
           Help.Ozil.Startup
               Help.Ozil.Startup.Core
