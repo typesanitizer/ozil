@@ -63,7 +63,7 @@ import Data.Text (Text, pack, unpack)
 import Data.Vector (Vector)
 import qualified Data.Vector.Unboxed
 import Data.Void
-import GHC.Generics (Generic (..))
+import GHC.Generics (Generic)
 import GHC.Stack (HasCallStack)
 import Language.Haskell.TH (mkName, nameBase, Name, DecsQ)
 import Text.Printf (printf)

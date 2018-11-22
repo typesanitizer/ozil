@@ -14,7 +14,7 @@ import Commons
 import Brick (textWidth)
 import Control.Monad.State.Strict
 import Data.Char (isSpace, isAlphaNum, isUpper)
-import Lens.Micro ((%~))
+import Lens.Micro ((%~), to)
 import Lens.Micro.TH (makeLenses)
 import Lens.Micro.Type (Lens', SimpleGetter)
 import Text.Megaparsec hiding (State)
@@ -190,7 +190,12 @@ flagP =
     Flag
     flagTextP
     (\s -> let (x, y) = s ^. flagIndent in fmap itemIndent x :| [y])
-    (flagIndent . _1)
+    -- We never return the saved description indentation so any new description
+    -- indentation is allowed. This flexibility is kinda' needed because
+    -- description indentations can be different for different flag blocks.
+    -- For example, fd (https://github.com/sharkdp/fd) has different indentations
+    -- for description blocks of flags vs options (flags that take arguments).
+    (to (const Nothing))
     (\itmInd descInd s -> case s ^. flagIndent of
         (Just _,  Just _)  -> pure ()
         (Nothing, Just _)  -> unreachableError
