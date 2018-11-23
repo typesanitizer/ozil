@@ -18,6 +18,7 @@ porcelain for `man`/`--help` + `less`/`more`/`most`.
 - [Contributing](#contributing)
 - [Thanks](#thanks)
 - [Miscellaneous](#miscellaneous)
+  * [Alternatives](#alternatives)
   * [Relation to mandb](#relation-to-mandb)
   * [Non-goals](#non-goals)
 
@@ -114,6 +115,30 @@ have been possible without it :smile:. Also, thanks to Mark Karpov for
 Megaparsec.
 
 ## Miscellaneous
+
+### Alternatives
+
+Let's say you don't want to install `ozil` for some reason but still want
+some of the features. How can you get that?
+
+* For automatic launching, you can have a shell function. For example, I have
+  the following function which I used before writing `ozil` -
+  ```
+  function vh() { # vh == view help
+      if [ "$1" = "stack" ]; then
+          "$@" --help | less
+      else
+          man "$@" || ("$@" --help | less -R) || ("$@ -h | less -R)
+      fi
+  }
+  ```
+  which is fairly crude, doesn't handle all the cases, but still kinda' works.
+* For following links inside man pages, you can use
+  [`man2html(1)`](https://linux.die.net/man/1/man2html) to generate HTML files
+  for all the man pages you typically consult. It will try to guess links to
+  other man pages and insert them as hyperlinks. You can then use a text-based
+  browser like [`lynx(1)`](https://linux.die.net/man/1/lynx) to view those pages
+  in your terminal.
 
 ### Relation to mandb
 
