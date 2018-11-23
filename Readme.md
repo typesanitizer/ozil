@@ -3,7 +3,8 @@
 `ozil` assists you with viewing man/help pages. It is intended as a
 porcelain for `man`/`--help` + `less`/`more`/`most`.
 
-[Note: Support for man pages is not yet ready.]
+[Note: Support for man pages is not yet ready. If you try to read a man page,
+`ozil` might crash or display something weird.]
 
 ## Table of contents
 
@@ -45,9 +46,11 @@ porcelain for `man`/`--help` + `less`/`more`/`most`.
 
 ### Planned
 
--   Basic options to customize appearance (with hot-reloading).
--   Proper man page support (fill remain check-boxes in Feature list).
--   Search text (see [issue 10](https://github.com/theindigamer/ozil/issues/10)).
+- Proper man page support (fill remain check-boxes in Feature list). Given the
+  variety of macros present in man pages, this is a big task, so please have
+  some patience. :sweat_smile:
+- Basic options to customize appearance (with hot-reloading).
+- Search text (see [issue 10](https://github.com/theindigamer/ozil/issues/10)).
 
 ## Platforms
 
@@ -83,7 +86,8 @@ see the help for `foo bar` (where `bar` is a subcommand of `foo`) run
 `ozil 'foo bar'`.
 
 If you're want a man page from a specific section (e.g. `man(1)`), you
-can use `ozil man.1`.
+can use `ozil man.1` (Note: This might still crash as documented at the
+beginning of the Readme).
 
 That's mostly it. `ozil` will guide you as needed. In case of
 ambiguities, it will present you with an option to make a choice and
