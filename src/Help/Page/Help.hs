@@ -162,7 +162,8 @@ plainP = do
   spaces <- takeWhileP Nothing isSpace
   ind <- getIndent
   modify (set curPlainIndent (Just ind))
-  rest <- takeWhile1P' (/= '\n') <* optional newline
+  let takeMore = if T.null spaces then takeWhile1P else takeWhileP
+  rest <- takeMore Nothing (/= '\n') <* optional newline
   pure $ Plain (T.snoc (spaces <> rest) '\n')
 
 ------------------------------------------------------------
