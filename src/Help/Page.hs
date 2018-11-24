@@ -33,7 +33,7 @@ module Help.Page
 
 import Commons
 
-import Development.BuildSystem (mkExecArgs)
+import Development.BuildSystem (getHelpTextViaBS, mkExecArgs)
 import Help.Page.Help
 import Help.Page.Internal
 import Help.Page.Lenses (binaryPath, section, name, subcommandPath, anchors)
@@ -85,6 +85,11 @@ displayHelpPageSummary (HelpPageSummary bp scp sh _) =
   where
     hstr = if sh then "-h" else "--help"
 
+mkProcessArgs :: BinaryPath -> [Subcommand] -> (String, [String])
+mkProcessArgs bp subcs = case bp of
+  Global fp -> (fp, map show subcs)
+  Local _pf bs bin -> mkExecArgs bs bin subcs
+
 ----------------------------------------------------------------------
 -- ** Fetching documentation using summaries
 
@@ -105,11 +110,6 @@ getManPage mps = do
     else T.readFile path
   pure (Just (Man mps (parseManPage txt)))
 
-mkProcessArgs :: BinaryPath -> [Subcommand] -> (String, [String])
-mkProcessArgs bp subcs = case bp of
-  Global fp -> (fp, map show subcs)
-  Local _pf bs bin -> mkExecArgs bs bin subcs
-
 getHelpPageSummary :: BinaryPath -> [Subcommand] -> IO (Maybe HelpPageSummary)
 getHelpPageSummary binPath subcPath = do
   d1 <- go ["-h"]
@@ -117,8 +117,9 @@ getHelpPageSummary binPath subcPath = do
   pure $ maybe d2 (Just . mkHPS True) d1
   where
     mkHPS = HelpPageSummary binPath subcPath
-    go hstr = uncurry readProcessSimple $ (<> hstr)
-      <$> mkProcessArgs binPath subcPath
+    go hstr = case binPath of
+      Global fp -> readProcessSimple fp (map show subcPath <> hstr)
+      Local _pf bs bin -> getHelpTextViaBS bs bin subcPath hstr
 
 getManPageSummary :: Text -> Text -> IO (Maybe ManPageSummary)
 getManPageSummary (unpack -> name_) (unpack -> section_) = do
@@ -132,8 +133,9 @@ getHelpPage hsum@(HelpPageSummary binPath subcPath short _) =
   let hstr = if short then ["-h"] else ["--help"]
   in fmap (Help hsum . parseHelpPage) <$> go hstr
   where
-    go hstr = uncurry readProcessSimple $ (<> hstr)
-      <$> mkProcessArgs binPath subcPath
+    go hstr = case binPath of
+      Global fp -> readProcessSimple fp (map show subcPath <> hstr)
+      Local _pf bs bin -> getHelpTextViaBS bs bin subcPath hstr
 
 ----------------------------------------------------------------------
 -- ** Saving summaries for later use
