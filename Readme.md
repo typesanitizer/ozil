@@ -62,8 +62,10 @@ changes are made to the Vty package which is a dependency.)
 
 ### Download a binary
 
-Binaries are unavailable at the moment but I plan on adding them. See
-[issue 12](https://github.com/theindigamer/ozil/issues/12) for current status.
+A binary is available for 64-bit Linux.
+See [Releases](https://github.com/theindigamer/ozil/releases/tag/v1.0-alpha).
+I've only tested it on an Ubuntu VM, so if you face any problems in using it
+(either on Ubuntu or on some other Linux distro), please open an issue.
 
 ### Building from source
 
